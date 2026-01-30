@@ -7,7 +7,7 @@ const db = require('../db/db');
  */
 const findById = async (id) => {
     const result = await db.query(
-        `SELECT id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+        `SELECT id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                 meal_time as "mealTime", cancel_cutoff as "cancelCutoff"
          FROM meals WHERE id = $1`,
         [id]
@@ -22,7 +22,7 @@ const findById = async (id) => {
  */
 const findAllByDate = async (date) => {
     const result = await db.query(
-        `SELECT id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+        `SELECT id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                 meal_time as "mealTime", cancel_cutoff as "cancelCutoff"
          FROM meals WHERE date = $1
          ORDER BY 
@@ -44,7 +44,7 @@ const findAllByDate = async (date) => {
  */
 const findByDateRange = async (startDate, endDate) => {
     const result = await db.query(
-        `SELECT id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+        `SELECT id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                 meal_time as "mealTime", cancel_cutoff as "cancelCutoff"
          FROM meals WHERE date BETWEEN $1 AND $2
          ORDER BY date, 
@@ -67,7 +67,7 @@ const create = async ({ date, type, menuItems = 'Standard Menu', isGreenDay = fa
     const result = await db.query(
         `INSERT INTO meals (date, type, menu_items, is_green_day, meal_time, cancel_cutoff)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+         RETURNING id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                    meal_time as "mealTime", cancel_cutoff as "cancelCutoff"`,
         [date, type, menuItems, isGreenDay, mealTime || getDefaultMealTime(type), cancelCutoff || getDefaultCutoff(type)]
     );
@@ -110,7 +110,7 @@ const update = async (id, data) => {
     const result = await db.query(
         `UPDATE meals SET ${fields.join(', ')}
          WHERE id = $${paramCount}
-         RETURNING id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+         RETURNING id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                    meal_time as "mealTime", cancel_cutoff as "cancelCutoff"`,
         values
     );
@@ -134,7 +134,7 @@ const deleteById = async (id) => {
  */
 const findAll = async () => {
     const result = await db.query(
-        `SELECT id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+        `SELECT id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                 meal_time as "mealTime", cancel_cutoff as "cancelCutoff"
          FROM meals ORDER BY date DESC, 
             CASE type 
@@ -173,7 +173,7 @@ const findPaginated = async ({ page = 1, limit = 10, search = '' }) => {
     const total = parseInt(countResult.rows[0].count, 10);
 
     const mealsResult = await db.query(
-        `SELECT id, date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+        `SELECT id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
                 meal_time as "mealTime", cancel_cutoff as "cancelCutoff"
          FROM meals 
          WHERE menu_items ILIKE $1
@@ -196,6 +196,46 @@ const findPaginated = async ({ page = 1, limit = 10, search = '' }) => {
     };
 };
 
+/**
+ * Upsert many meals (Bulk add/update)
+ * @param {Array} meals - Array of meal objects
+ * @returns {Promise<Array>} - Upserted meals
+ */
+const upsertMany = async (meals) => {
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+        const results = [];
+
+        for (const meal of meals) {
+            const { date, type, menuItems, isGreenDay, mealTime, cancelCutoff } = meal;
+            const res = await client.query(
+                `INSERT INTO meals (date, type, menu_items, is_green_day, meal_time, cancel_cutoff)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (date, type) 
+                 DO UPDATE SET 
+                    menu_items = EXCLUDED.menu_items,
+                    is_green_day = EXCLUDED.is_green_day,
+                    meal_time = EXCLUDED.meal_time,
+                    cancel_cutoff = EXCLUDED.cancel_cutoff,
+                    updated_at = CURRENT_TIMESTAMP
+                 RETURNING id, date::text as date, type, menu_items as "menuItems", is_green_day as "isGreenDay",
+                           meal_time as "mealTime", cancel_cutoff as "cancelCutoff"`,
+                [date, type, menuItems, isGreenDay || false, mealTime || getDefaultMealTime(type), cancelCutoff || getDefaultCutoff(type)]
+            );
+            results.push(res.rows[0]);
+        }
+
+        await client.query('COMMIT');
+        return results;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
     findById,
     findAllByDate,
@@ -204,5 +244,6 @@ module.exports = {
     update,
     deleteById,
     findAll,
-    findPaginated
+    findPaginated,
+    upsertMany
 };

@@ -34,15 +34,17 @@ const getWeeklyStats = async () => {
 const getWastageData = async () => {
     const result = await db.query(`
         SELECT 
+            m.id,
             m.date,
             m.type,
+            m.actual_wastage,
             COUNT(CASE WHEN a.status = 'going' THEN 1 END) as actual_attendance,
             COALESCE(SUM(a.guest_count), 0) as guests,
             COUNT(CASE WHEN a.status = 'going' THEN 1 END) + COALESCE(SUM(a.guest_count), 0) as total_demand
         FROM meals m
         LEFT JOIN attendances a ON m.id = a.meal_id
         WHERE m.date >= CURRENT_DATE - INTERVAL '45 days' AND m.date <= CURRENT_DATE
-        GROUP BY m.date, m.type, m.id
+        GROUP BY m.id, m.date, m.type, m.actual_wastage
         ORDER BY m.date,
             CASE m.type 
                 WHEN 'breakfast' THEN 1 
@@ -55,10 +57,14 @@ const getWastageData = async () => {
     return result.rows.map(row => {
         const totalDemand = parseInt(row.total_demand) || 0;
         const prepared = Math.ceil(totalDemand * 1.1) + 5; // 10% buffer + 5
-        const wastage = Math.max(0, prepared - totalDemand);
+
+        // Use actual wastage if entered, otherwise estimate
+        const hasActualWastage = row.actual_wastage !== null;
+        const wastage = hasActualWastage ? parseInt(row.actual_wastage) : Math.max(0, prepared - totalDemand);
         const wastagePercent = prepared > 0 ? Math.round((wastage / prepared) * 100) : 0;
 
         return {
+            id: row.id,
             date: row.date,
             type: row.type,
             actualAttendance: parseInt(row.actual_attendance) || 0,
@@ -66,9 +72,24 @@ const getWastageData = async () => {
             totalDemand,
             estimatedPrepared: prepared,
             estimatedWastage: wastage,
-            wastagePercent
+            wastagePercent,
+            hasActualWastage
         };
     });
+};
+
+/**
+ * Update actual wastage for a meal
+ * @param {string} mealId - Meal ID
+ * @param {number} actualWastage - Actual wastage count
+ * @returns {Promise<Object>} - Updated meal
+ */
+const updateWastage = async (mealId, actualWastage) => {
+    const result = await db.query(
+        `UPDATE meals SET actual_wastage = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+        [actualWastage, mealId]
+    );
+    return result.rows[0];
 };
 
 const getAllUsers = async (page = 1, limit = 10, search = '') => {
@@ -140,5 +161,6 @@ module.exports = {
     getWeeklyStats,
     getWastageData,
     getAllUsers,
-    getMealSettings
+    getMealSettings,
+    updateWastage
 };

@@ -107,10 +107,16 @@ const initializeSchema = async () => {
                 is_green_day BOOLEAN DEFAULT false,
                 meal_time TIME DEFAULT '12:00:00',
                 cancel_cutoff TIME DEFAULT '10:00:00',
+                actual_wastage INTEGER DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(date, type)
             )
+        `);
+
+        // Add actual_wastage column if not exists (for existing databases)
+        await query(`
+            ALTER TABLE meals ADD COLUMN IF NOT EXISTS actual_wastage INTEGER DEFAULT NULL
         `);
 
         // Create Attendances table

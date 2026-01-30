@@ -68,6 +68,26 @@ router.get('/wastage', auth, adminAuth, async (req, res) => {
     }
 });
 
+// Update Actual Wastage for a meal
+router.put('/wastage/:mealId', auth, adminAuth, async (req, res) => {
+    try {
+        const { mealId } = req.params;
+        const { actualWastage } = req.body;
+
+        if (actualWastage === undefined || actualWastage < 0) {
+            return res.status(400).json({ error: 'Valid wastage value required' });
+        }
+
+        const meal = await adminQueries.updateWastage(mealId, actualWastage);
+        if (!meal) {
+            return res.status(404).json({ error: 'Meal not found' });
+        }
+        res.json({ success: true, meal });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get All Users
 router.get('/users', auth, adminAuth, async (req, res) => {
     try {
@@ -141,6 +161,20 @@ router.get('/meals', auth, adminAuth, async (req, res) => {
             search
         });
         res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Bulk Upsert Meals (Weekly Menu)
+router.post('/meals/bulk', auth, adminAuth, async (req, res) => {
+    try {
+        const { meals } = req.body;
+        if (!meals || !Array.isArray(meals)) {
+            return res.status(400).json({ error: 'Meals array is required' });
+        }
+        const result = await mealQueries.upsertMany(meals);
+        res.json({ success: true, count: result.length, meals: result });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

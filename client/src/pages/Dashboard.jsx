@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-    Leaf, User, Users, Calendar, LogOut, ChefHat,
-    X, ChevronLeft, ChevronRight, Check, Star, MessageSquare, Vote
+    Leaf, Users, Calendar, LogOut, ChefHat, User,
+    X, ChevronLeft, ChevronRight, Check, Star, MessageSquare, Vote, AlertCircle
 } from 'lucide-react';
+import Footer from '../components/Footer';
 
 export default function Dashboard() {
     const { user, logout } = useAuth();
-    const [meals, setMeals] = useState([]);
+    const [allMeals, setAllMeals] = useState([]);
     const [karma, setKarma] = useState(user?.karmaPoints || 0);
     const [loading, setLoading] = useState(true);
     const [impact, setImpact] = useState({ foodSavedKg: 0, mealsSaved: 0 });
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
     const [karmaPop, setKarmaPop] = useState(null); // { points: number, id: Date.now() }
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Feedback states
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -44,12 +46,12 @@ export default function Dashboard() {
     const fetchMeals = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/meals/today`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/meals/upcoming`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
                 const data = await res.json();
-                setMeals(data);
+                setAllMeals(data);
             }
         } catch (error) {
             console.error('Error fetching meals:', error);
@@ -116,8 +118,8 @@ export default function Dashboard() {
 
     const toggleStatus = async (id, currentStatus) => {
         const newStatus = currentStatus === 'going' ? 'not_eating' : 'going';
-        const oldMeals = [...meals];
-        setMeals(meals.map(m => m.id === id ? { ...m, userStatus: newStatus, processing: true } : m));
+        const oldMeals = [...allMeals];
+        setAllMeals(allMeals.map(m => m.id === id ? { ...m, userStatus: newStatus, processing: true } : m));
 
         try {
             const token = localStorage.getItem('token');
@@ -135,20 +137,25 @@ export default function Dashboard() {
                 alert('Failed to update status');
             } else {
                 const data = await res.json();
-                setMeals(prev => prev.map(m => m.id === id ? { ...m, userStatus: newStatus, processing: false } : m));
+                setAllMeals(prev => prev.map(m => m.id === id ? {
+                    ...m,
+                    userStatus: newStatus,
+                    isKarmaClaimed: data.isKarmaClaimed ?? m.isKarmaClaimed,
+                    processing: false
+                } : m));
                 if (data.karma) setKarma(data.karma);
                 if (data.gained) triggerKarmaPop(data.gained);
                 fetchImpact(); // Refresh impact after status change
             }
         } catch (error) {
-            setMeals(oldMeals);
+            setAllMeals(oldMeals);
         }
     };
 
     const toggleGuest = async (id, currentGuestCount) => {
         const newCount = (currentGuestCount || 0) >= 3 ? 0 : (currentGuestCount || 0) + 1;
-        const oldMeals = [...meals];
-        setMeals(meals.map(m => m.id === id ? { ...m, guestCount: newCount, processing: true } : m));
+        const oldMeals = [...allMeals];
+        setAllMeals(allMeals.map(m => m.id === id ? { ...m, guestCount: newCount, processing: true } : m));
 
         try {
             const token = localStorage.getItem('token');
@@ -166,12 +173,17 @@ export default function Dashboard() {
                 alert('Failed to update guest count');
             } else {
                 const data = await res.json();
-                setMeals(prev => prev.map(m => m.id === id ? { ...m, guestCount: newCount, processing: false } : m));
+                setAllMeals(prev => prev.map(m => m.id === id ? {
+                    ...m,
+                    guestCount: newCount,
+                    isKarmaClaimed: data.isKarmaClaimed ?? m.isKarmaClaimed,
+                    processing: false
+                } : m));
                 if (data.karma) setKarma(data.karma);
                 if (data.gained) triggerKarmaPop(data.gained);
             }
         } catch (error) {
-            setMeals(oldMeals);
+            setAllMeals(oldMeals);
         }
     };
 
@@ -296,390 +308,437 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24">
-            {/* Header */}
-            <header className="bg-white sticky top-0 z-20 shadow-sm">
-                <div className="max-w-lg mx-auto px-4 py-4 flex justify-between items-center">
-                    <div>
-                        <h1 className="text-xl font-bold text-gray-800">
-                            Hi, {user?.name || 'Student'} 👋
-                        </h1>
-                        <p className="text-sm text-gray-500">
-                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="badge badge-karma animate-pulse-subtle">
-                            <Leaf size={14} />
-                            <span>{karma} Karma</span>
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="flex-grow pb-24">
+                {/* Header */}
+                <header className="bg-white sticky top-0 z-20 shadow-sm">
+                    <div className="max-w-lg mx-auto px-4 py-4 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-xl font-bold text-gray-800">
+                                Hi, {user?.name || 'Student'} 👋
+                            </h1>
+                            <p className="text-sm text-gray-500">
+                                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                            </p>
                         </div>
-                        <button
-                            onClick={logout}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                            <LogOut size={20} />
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
-                {/* Impact Banner */}
-                <div
-                    className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden animate-fade-in"
-                    style={{ background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' }}
-                >
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-2xl">🌍</span>
-                            <h3 className="font-bold text-lg">Your Impact</h3>
-                        </div>
-                        <p className="text-white/90">
-                            You saved <span className="font-bold text-2xl">{impact.foodSavedKg} kg</span> of food so far!
-                        </p>
-                        <p className="text-sm text-white/70 mt-1">That's approximately {impact.mealsSaved} meals saved</p>
-                    </div>
-                    <Leaf className="absolute -bottom-6 -right-6 text-white/10 w-32 h-32" />
-                </div>
-
-                {/* Today's Meals */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <ChefHat size={20} className="text-red-500" />
-                            Today's Meals
-                        </h2>
-                        <span className="text-sm text-gray-500">{meals.length} meals</span>
-                    </div>
-
-                    {meals.length === 0 && (
-                        <div className="card p-8 text-center">
-                            <p className="text-gray-500">No meals scheduled for today.</p>
-                        </div>
-                    )}
-
-                    {meals.map((meal, index) => (
-                        <div
-                            key={meal.id}
-                            className={`card overflow-hidden animate-fade-in relative status-transition ${meal.processing ? 'opacity-80' : ''}`}
-                            style={{
-                                animationDelay: `${index * 0.1}s`,
-                                transform: meal.userStatus === 'going' ? 'scale(1.02)' : 'scale(1)',
-                                borderColor: meal.userStatus === 'going' ? '#EF4444' : '#E5E7EB',
-                                boxShadow: meal.userStatus === 'going' ? '0 10px 15px -3px rgba(239, 68, 68, 0.1)' : ''
-                            }}
-                        >
-                            {/* Processing Overlay */}
-                            {meal.processing && (
-                                <div className="absolute inset-0 z-10 processing-overlay flex items-center justify-center">
-                                    <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                                </div>
-                            )}
-
-                            <div className="p-5">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 className="font-bold text-xl text-gray-800 capitalize">
-                                            {meal.type}
-                                        </h3>
-                                        <p className="text-sm text-gray-400">{getMealTime(meal.type)}</p>
-                                    </div>
-                                    <span className={`badge status-transition ${meal.userStatus === 'going' ? 'badge-success animate-pulse-subtle' : 'badge-danger'}`}>
-                                        {meal.userStatus === 'going' ? '✓ Eating' : '✗ Skipping'}
-                                    </span>
-                                </div>
-
-                                <p className="text-gray-600 mb-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
-                                    {meal.menuItems || 'Menu not available'}
-                                </p>
-
-                                <div className="flex gap-3">
-                                    <button
-                                        disabled={meal.processing}
-                                        onClick={() => toggleStatus(meal.id, meal.userStatus)}
-                                        className={`flex-1 btn text-sm status-transition active:scale-95 ${meal.userStatus === 'going'
-                                            ? 'btn-secondary text-red-500 border-red-200 hover:bg-red-50'
-                                            : 'btn-primary'
-                                            }`}
-                                        style={meal.userStatus !== 'going' ? { background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' } : {}}
-                                    >
-                                        {meal.userStatus === 'going' ? 'Cancel Meal' : 'I am Eating (+1)'}
-                                    </button>
-
-                                    <button
-                                        disabled={meal.processing}
-                                        onClick={() => toggleGuest(meal.id, meal.guestCount)}
-                                        className={`btn px-4 status-transition active:scale-110 ${(meal.guestCount || 0) > 0
-                                            ? 'bg-blue-50 text-blue-600 border-2 border-blue-200 animate-pulse-subtle'
-                                            : 'btn-secondary'
-                                            }`}
-                                    >
-                                        <Users size={18} className={(meal.guestCount || 0) > 0 ? 'animate-bounce' : ''} />
-                                        <span className="font-bold">
-                                            {(meal.guestCount || 0) > 0 ? `+${meal.guestCount}` : '+'}
-                                        </span>
-                                    </button>
-                                </div>
+                        <div className="flex items-center gap-3">
+                            <div className="badge badge-karma animate-pulse-subtle">
+                                <Leaf size={14} />
+                                <span>{karma} Karma</span>
                             </div>
+                            <button
+                                onClick={logout}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                                <LogOut size={20} />
+                            </button>
                         </div>
-                    ))}
-                </div>
+                    </div>
+                </header>
 
-                {/* Long Break Button */}
-                <button
-                    onClick={() => setIsLeaveModalOpen(true)}
-                    className="btn btn-secondary w-full py-4 text-gray-600 flex items-center justify-center gap-2"
-                >
-                    <Calendar size={20} />
-                    <span>Mark Long Leave / Vacation</span>
-                </button>
+                <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+                    {/* Impact Banner */}
+                    <div
+                        className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden animate-fade-in"
+                        style={{ background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' }}
+                    >
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-2xl">🌍</span>
+                                <h3 className="font-bold text-lg">Your Impact</h3>
+                            </div>
+                            <p className="text-white/90">
+                                You saved <span className="font-bold text-2xl">{impact.foodSavedKg} kg</span> of food so far!
+                            </p>
+                            <p className="text-sm text-white/70 mt-1">That's approximately {impact.mealsSaved} meals saved</p>
+                        </div>
+                        <Leaf className="absolute -bottom-6 -right-6 text-white/10 w-32 h-32" />
+                    </div>
 
-                {/* Active Polls */}
-                {activePolls.length > 0 && (
-                    <div className="space-y-4">
-                        {activePolls.map(poll => {
-                            const totalVotes = poll.options.reduce((sum, o) => sum + parseInt(o.voteCount || 0), 0);
-                            const hasVoted = poll.userVote;
+                    {/* Date Navigator */}
+                    <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex items-center justify-between overflow-x-auto">
+                        {Array.from({ length: 7 }, (_, i) => {
+                            const date = new Date();
+                            date.setDate(date.getDate() + i);
+                            const dateStr = date.toISOString().split('T')[0];
+                            const isToday = i === 0;
+                            const isActive = selectedDate === dateStr;
 
                             return (
-                                <div key={poll.id} className="card p-5 border-2 border-purple-200 animate-fade-in">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Vote size={20} className="text-purple-500" />
-                                        <h3 className="font-bold text-gray-800">{poll.question}</h3>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mb-4">
-                                        Poll ends: {new Date(poll.endTime).toLocaleString()}
-                                    </p>
-                                    <div className="space-y-2">
-                                        {poll.options.map(opt => {
-                                            const percent = totalVotes > 0 ? Math.round((parseInt(opt.voteCount) / totalVotes) * 100) : 0;
-                                            const isSelected = poll.userVote === opt.id;
-
-                                            return (
-                                                <button
-                                                    key={opt.id}
-                                                    onClick={() => !hasVoted && submitVote(poll.id, opt.id)}
-                                                    disabled={hasVoted || pollVoting === poll.id}
-                                                    className={`w-full text-left relative rounded-xl overflow-hidden transition-all ${hasVoted ? 'cursor-default' : 'hover:ring-2 hover:ring-purple-300'
-                                                        } ${isSelected ? 'ring-2 ring-purple-500' : ''}`}
-                                                >
-                                                    <div
-                                                        className={`absolute h-full transition-all ${isSelected ? 'bg-purple-200' : 'bg-gray-100'}`}
-                                                        style={{ width: hasVoted ? `${percent}%` : '0%' }}
-                                                    />
-                                                    <div className="relative flex justify-between items-center p-3">
-                                                        <span className={`text-sm ${isSelected ? 'font-semibold text-purple-700' : 'text-gray-700'}`}>
-                                                            {isSelected && '✓ '}{opt.optionText}
-                                                        </span>
-                                                        {hasVoted && (
-                                                            <span className="text-xs font-medium text-purple-600">{percent}%</span>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    {hasVoted && (
-                                        <p className="text-xs text-gray-400 mt-3 text-center">
-                                            You voted! Total: {totalVotes} votes
-                                        </p>
+                                <button
+                                    key={dateStr}
+                                    onClick={() => setSelectedDate(dateStr)}
+                                    className={`flex-shrink-0 flex flex-col items-center justify-center w-14 py-3 rounded-xl transition-all ${isActive
+                                        ? 'bg-red-500 text-white shadow-lg shadow-red-200'
+                                        : 'hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <span className={`text-[10px] font-bold uppercase mb-1 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                                    </span>
+                                    <span className="text-sm font-bold">
+                                        {date.getDate()}
+                                    </span>
+                                    {isToday && !isActive && (
+                                        <div className="w-1 h-1 bg-red-500 rounded-full mt-1"></div>
                                     )}
-                                    {pollVoting === poll.id && (
-                                        <div className="text-center mt-3 text-purple-500 text-sm">
-                                            Submitting...
-                                        </div>
-                                    )}
-                                </div>
+                                </button>
                             );
                         })}
                     </div>
-                )}
 
-                {/* Feedback Form */}
-                {!isFeedbackOpen ? (
-                    <button
-                        onClick={() => setIsFeedbackOpen(true)}
-                        className="btn btn-secondary w-full py-4 text-gray-600 flex items-center justify-center gap-2"
-                    >
-                        <MessageSquare size={20} />
-                        <span>Give Meal Feedback</span>
-                    </button>
-                ) : (
-                    <div className="card p-5 animate-fade-in">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <MessageSquare size={20} className="text-red-500" />
-                                <h2 className="font-bold text-lg text-gray-800">Give Meal Feedback</h2>
-                            </div>
-                            <button
-                                onClick={() => setIsFeedbackOpen(false)}
-                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
+                    {/* Today's Meals */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <ChefHat size={20} className="text-red-500" />
+                                {selectedDate === new Date().toISOString().split('T')[0] ? "Today's Meals" : "Upcoming Meals"}
+                            </h2>
+                            <span className="text-sm text-gray-500">
+                                {allMeals.filter(m => m.date.startsWith(selectedDate)).length} meals
+                            </span>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="text-sm text-gray-500 mb-1 block">Select Date</label>
-                            <input
-                                type="date"
-                                value={feedbackDate}
-                                max={new Date().toISOString().split('T')[0]}
-                                onChange={(e) => {
-                                    setFeedbackDate(e.target.value);
-                                    fetchMealsForFeedback(e.target.value);
+                        {allMeals.filter(m => m.date.startsWith(selectedDate)).length === 0 && (
+                            <div className="card p-8 text-center text-gray-500 bg-gray-50 border-dashed">
+                                <AlertCircle size={32} className="mx-auto mb-2 opacity-20" />
+                                <p>No meals scheduled for this day.</p>
+                            </div>
+                        )}
+
+                        {allMeals.filter(m => m.date.startsWith(selectedDate)).map((meal, index) => (
+                            <div
+                                key={meal.id}
+                                className={`card overflow-hidden animate-fade-in relative status-transition ${meal.processing ? 'opacity-80' : ''} ${meal.isExpired ? 'opacity-60' : ''}`}
+                                style={{
+                                    animationDelay: `${index * 0.1}s`,
+                                    transform: meal.userStatus === 'going' && !meal.isExpired ? 'scale(1.02)' : 'scale(1)',
+                                    borderColor: meal.isExpired ? '#9CA3AF' : meal.userStatus === 'going' ? '#EF4444' : '#E5E7EB',
+                                    boxShadow: meal.userStatus === 'going' && !meal.isExpired ? '0 10px 15px -3px rgba(239, 68, 68, 0.1)' : ''
                                 }}
-                                className="input w-full"
-                            />
-                        </div>
-
-                        {feedbackLoading && (
-                            <div className="text-center py-4 text-gray-400">
-                                <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                                Loading meals...
-                            </div>
-                        )}
-
-                        {!feedbackLoading && feedbackDate && feedbackMeals.length === 0 && (
-                            <p className="text-center text-gray-400 py-4">No meals found for this date</p>
-                        )}
-
-                        {!feedbackLoading && feedbackMeals.length > 0 && (
-                            <>
-                                {/* Meal Type Dropdown */}
-                                <div className="mb-4">
-                                    <label className="text-sm text-gray-500 mb-1 block">Select Meal</label>
-                                    <select
-                                        value={selectedFeedbackMeal?.id || ''}
-                                        onChange={(e) => {
-                                            const meal = feedbackMeals.find(m => m.id === e.target.value);
-                                            setSelectedFeedbackMeal(meal || null);
-                                            setFeedbackRating(0);
-                                            setFeedbackRemarks('');
-                                        }}
-                                        className="input w-full"
-                                    >
-                                        <option value="">-- Choose Meal --</option>
-                                        {feedbackMeals.map(meal => (
-                                            <option key={meal.id} value={meal.id}>
-                                                {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Show menu, rating, remarks only when a meal is selected */}
-                                {selectedFeedbackMeal && (
-                                    <div className="p-4 bg-gray-50 rounded-xl">
-                                        <p className="text-sm text-gray-600 mb-3 italic bg-white p-3 rounded-lg border border-gray-100">
-                                            <span className="font-semibold">Menu:</span> {selectedFeedbackMeal.menuItems || 'N/A'}
-                                        </p>
-
-                                        {/* Star Rating */}
-                                        <div className="flex gap-1 my-3">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                                <button
-                                                    key={star}
-                                                    onClick={() => setFeedbackRating(star)}
-                                                    className="p-1 transition-transform hover:scale-110"
-                                                >
-                                                    <Star
-                                                        size={28}
-                                                        className={`transition-colors ${feedbackRating >= star
-                                                            ? 'text-yellow-400 fill-yellow-400'
-                                                            : 'text-gray-300'
-                                                            }`}
-                                                    />
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <textarea
-                                            placeholder="Add remarks (optional)"
-                                            value={feedbackRemarks}
-                                            onChange={(e) => setFeedbackRemarks(e.target.value)}
-                                            className="input w-full text-sm resize-none h-20 mb-3"
-                                        />
-
-                                        {/* Anonymous Toggle */}
-                                        <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-                                            <button
-                                                onClick={() => setIsAnonymous(false)}
-                                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${!isAnonymous
-                                                    ? 'bg-red-500 text-white shadow-sm'
-                                                    : 'text-gray-600 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                <User size={14} className="inline mr-1" />
-                                                With my name
-                                            </button>
-                                            <button
-                                                onClick={() => setIsAnonymous(true)}
-                                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${isAnonymous
-                                                    ? 'bg-gray-700 text-white shadow-sm'
-                                                    : 'text-gray-600 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                🕵️ Anonymous
-                                            </button>
-                                        </div>
-
-                                        <button
-                                            onClick={submitFeedback}
-                                            disabled={feedbackSubmitting || !feedbackRating}
-                                            className="btn btn-primary w-full text-sm py-3 disabled:opacity-50"
-                                            style={{ background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' }}
-                                        >
-                                            {feedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
-                                        </button>
+                            >
+                                {/* Processing Overlay */}
+                                {meal.processing && (
+                                    <div className="absolute inset-0 z-10 processing-overlay flex items-center justify-center">
+                                        <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                 )}
-                            </>
-                        )}
+
+                                <div className="p-5">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-xl text-gray-800 capitalize">
+                                                {meal.type}
+                                            </h3>
+                                            <p className="text-sm text-gray-400">{getMealTime(meal.type)}</p>
+                                        </div>
+                                        {meal.isExpired ? (
+                                            <span className="badge bg-gray-200 text-gray-500">
+                                                ⏰ Expired
+                                            </span>
+                                        ) : (
+                                            <span className={`badge status-transition ${meal.userStatus === 'going' ? 'badge-success animate-pulse-subtle' : 'badge-danger'}`}>
+                                                {meal.userStatus === 'going' ? '✓ Eating' : '✗ Skipping'}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <p className="text-gray-600 mb-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
+                                        {meal.menuItems || 'Menu not available'}
+                                    </p>
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            disabled={meal.processing || meal.isExpired}
+                                            onClick={() => toggleStatus(meal.id, meal.userStatus)}
+                                            className={`flex-1 btn text-sm status-transition active:scale-95 ${meal.isExpired
+                                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                : meal.userStatus === 'going'
+                                                    ? 'btn-secondary text-red-500 border-red-200 hover:bg-red-50'
+                                                    : 'btn-primary'
+                                                }`}
+                                            style={!meal.isExpired && meal.userStatus !== 'going' ? { background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' } : {}}
+                                        >
+                                            {meal.isExpired ? 'Meal Ended' : meal.userStatus === 'going' ? 'Cancel Meal' : `I am going${!meal.isKarmaClaimed ? ' (+1)' : ''}`}
+                                        </button>
+
+                                        <button
+                                            disabled={meal.processing || meal.isExpired}
+                                            onClick={() => toggleGuest(meal.id, meal.guestCount)}
+                                            className={`btn whitespace-nowrap status-transition active:scale-110 ${meal.isExpired
+                                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                : (meal.guestCount || 0) > 0
+                                                    ? 'bg-blue-50 text-blue-600 border-2 border-blue-200 animate-pulse-subtle'
+                                                    : 'btn-secondary'
+                                                }`}
+                                        >
+                                            <Users size={18} className={!meal.isExpired && (meal.guestCount || 0) > 0 ? 'animate-bounce' : ''} />
+                                            <span className="text-sm font-semibold ml-1">
+                                                {(meal.guestCount || 0) > 0 ? `Guest: ${meal.guestCount}` : `Add Guest${!meal.isKarmaClaimed ? ' (+1)' : ''}`}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                )
-                }
-            </main >
 
-            {/* Leave Modal */}
-            {
-                isLeaveModalOpen && (
-                    <LeaveModal
-                        onClose={() => setIsLeaveModalOpen(false)}
-                        onSubmit={applyBreak}
-                    />
-                )
-            }
 
-            {/* Karma Animation */}
-            {
-                karmaPop && (
-                    <KarmaPop key={karmaPop.id} points={karmaPop.points} />
-                )
-            }
-
-            {/* Feedback Toast Notification */}
-            {
-                feedbackToast && (
-                    <div
-                        className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-up ${feedbackToast.type === 'success'
-                            ? 'bg-green-500 text-white'
-                            : 'bg-red-500 text-white'
-                            }`}
+                    {/* Long Break Button */}
+                    <button
+                        onClick={() => setIsLeaveModalOpen(true)}
+                        className="btn btn-secondary w-full py-4 text-gray-600 flex items-center justify-center gap-2"
                     >
-                        <div className="flex items-center gap-2">
-                            {feedbackToast.type === 'success' ? (
-                                <Check size={20} />
-                            ) : (
-                                <X size={20} />
-                            )}
-                            <span className="font-medium">{feedbackToast.message}</span>
-                        </div>
-                    </div>
-                )
-            }
+                        <Calendar size={20} />
+                        <span>Mark Long Leave / Vacation</span>
+                    </button>
 
-            <style>{`
+                    {/* Active Polls */}
+                    {activePolls.length > 0 && (
+                        <div className="space-y-4">
+                            {activePolls.map(poll => {
+                                const totalVotes = poll.options.reduce((sum, o) => sum + parseInt(o.voteCount || 0), 0);
+                                const hasVoted = poll.userVote;
+
+                                return (
+                                    <div key={poll.id} className="card p-5 border-2 border-purple-200 animate-fade-in">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Vote size={20} className="text-purple-500" />
+                                            <h3 className="font-bold text-gray-800">{poll.question}</h3>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mb-4">
+                                            Poll ends: {new Date(poll.endTime).toLocaleString()}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {poll.options.map(opt => {
+                                                const percent = totalVotes > 0 ? Math.round((parseInt(opt.voteCount) / totalVotes) * 100) : 0;
+                                                const isSelected = poll.userVote === opt.id;
+
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        onClick={() => !hasVoted && submitVote(poll.id, opt.id)}
+                                                        disabled={hasVoted || pollVoting === poll.id}
+                                                        className={`w-full text-left relative rounded-xl overflow-hidden transition-all ${hasVoted ? 'cursor-default' : 'hover:ring-2 hover:ring-purple-300'
+                                                            } ${isSelected ? 'ring-2 ring-purple-500' : ''}`}
+                                                    >
+                                                        <div
+                                                            className={`absolute h-full transition-all ${isSelected ? 'bg-purple-200' : 'bg-gray-100'}`}
+                                                            style={{ width: hasVoted ? `${percent}%` : '0%' }}
+                                                        />
+                                                        <div className="relative flex justify-between items-center p-3">
+                                                            <span className={`text-sm ${isSelected ? 'font-semibold text-purple-700' : 'text-gray-700'}`}>
+                                                                {isSelected && '✓ '}{opt.optionText}
+                                                            </span>
+                                                            {hasVoted && (
+                                                                <span className="text-xs font-medium text-purple-600">{percent}%</span>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {hasVoted && (
+                                            <p className="text-xs text-gray-400 mt-3 text-center">
+                                                You voted! Total: {totalVotes} votes
+                                            </p>
+                                        )}
+                                        {pollVoting === poll.id && (
+                                            <div className="text-center mt-3 text-purple-500 text-sm">
+                                                Submitting...
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Feedback Form */}
+                    {!isFeedbackOpen ? (
+                        <button
+                            onClick={() => setIsFeedbackOpen(true)}
+                            className="btn btn-secondary w-full py-4 text-gray-600 flex items-center justify-center gap-2"
+                        >
+                            <MessageSquare size={20} />
+                            <span>Give Meal Feedback</span>
+                        </button>
+                    ) : (
+                        <div className="card p-5 animate-fade-in">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare size={20} className="text-red-500" />
+                                    <h2 className="font-bold text-lg text-gray-800">Give Meal Feedback</h2>
+                                </div>
+                                <button
+                                    onClick={() => setIsFeedbackOpen(false)}
+                                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="text-sm text-gray-500 mb-1 block">Select Date</label>
+                                <input
+                                    type="date"
+                                    value={feedbackDate}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => {
+                                        setFeedbackDate(e.target.value);
+                                        fetchMealsForFeedback(e.target.value);
+                                    }}
+                                    className="input w-full"
+                                />
+                            </div>
+
+                            {feedbackLoading && (
+                                <div className="text-center py-4 text-gray-400">
+                                    <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                    Loading meals...
+                                </div>
+                            )}
+
+                            {!feedbackLoading && feedbackDate && feedbackMeals.length === 0 && (
+                                <p className="text-center text-gray-400 py-4">No meals found for this date</p>
+                            )}
+
+                            {!feedbackLoading && feedbackMeals.length > 0 && (
+                                <>
+                                    {/* Meal Type Dropdown */}
+                                    <div className="mb-4">
+                                        <label className="text-sm text-gray-500 mb-1 block">Select Meal</label>
+                                        <select
+                                            value={selectedFeedbackMeal?.id || ''}
+                                            onChange={(e) => {
+                                                const meal = feedbackMeals.find(m => m.id === e.target.value);
+                                                setSelectedFeedbackMeal(meal || null);
+                                                setFeedbackRating(0);
+                                                setFeedbackRemarks('');
+                                            }}
+                                            className="input w-full"
+                                        >
+                                            <option value="">-- Choose Meal --</option>
+                                            {feedbackMeals.map(meal => (
+                                                <option key={meal.id} value={meal.id}>
+                                                    {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Show menu, rating, remarks only when a meal is selected */}
+                                    {selectedFeedbackMeal && (
+                                        <div className="p-4 bg-gray-50 rounded-xl">
+                                            <p className="text-sm text-gray-600 mb-3 italic bg-white p-3 rounded-lg border border-gray-100">
+                                                <span className="font-semibold">Menu:</span> {selectedFeedbackMeal.menuItems || 'N/A'}
+                                            </p>
+
+                                            {/* Star Rating */}
+                                            <div className="flex gap-1 my-3">
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                    <button
+                                                        key={star}
+                                                        onClick={() => setFeedbackRating(star)}
+                                                        className="p-1 transition-transform hover:scale-110"
+                                                    >
+                                                        <Star
+                                                            size={28}
+                                                            className={`transition-colors ${feedbackRating >= star
+                                                                ? 'text-yellow-400 fill-yellow-400'
+                                                                : 'text-gray-300'
+                                                                }`}
+                                                        />
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <textarea
+                                                placeholder="Add remarks (optional)"
+                                                value={feedbackRemarks}
+                                                onChange={(e) => setFeedbackRemarks(e.target.value)}
+                                                className="input w-full text-sm resize-none h-20 mb-3"
+                                            />
+
+                                            {/* Anonymous Toggle */}
+                                            <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                                                <button
+                                                    onClick={() => setIsAnonymous(false)}
+                                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${!isAnonymous
+                                                        ? 'bg-red-500 text-white shadow-sm'
+                                                        : 'text-gray-600 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    <User size={14} className="inline mr-1" />
+                                                    With my name
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsAnonymous(true)}
+                                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${isAnonymous
+                                                        ? 'bg-gray-700 text-white shadow-sm'
+                                                        : 'text-gray-600 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    🕵️ Anonymous
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={submitFeedback}
+                                                disabled={feedbackSubmitting || !feedbackRating}
+                                                className="btn btn-primary w-full text-sm py-3 disabled:opacity-50"
+                                                style={{ background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' }}
+                                            >
+                                                {feedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )
+                    }
+                </main >
+
+                {/* Leave Modal */}
+                {
+                    isLeaveModalOpen && (
+                        <LeaveModal
+                            onClose={() => setIsLeaveModalOpen(false)}
+                            onSubmit={applyBreak}
+                        />
+                    )
+                }
+
+                {/* Karma Animation */}
+                {
+                    karmaPop && (
+                        <KarmaPop key={karmaPop.id} points={karmaPop.points} />
+                    )
+                }
+
+                {/* Feedback Toast Notification */}
+                {
+                    feedbackToast && (
+                        <div
+                            className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-up ${feedbackToast.type === 'success'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-red-500 text-white'
+                                }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                {feedbackToast.type === 'success' ? (
+                                    <Check size={20} />
+                                ) : (
+                                    <X size={20} />
+                                )}
+                                <span className="font-medium">{feedbackToast.message}</span>
+                            </div>
+                        </div>
+                    )
+                }
+
+                <style>{`
                 @keyframes floatUp {
                     0% { transform: translateY(0); opacity: 0; }
                     20% { opacity: 1; }
@@ -711,7 +770,9 @@ export default function Dashboard() {
                     animation: slideUp 0.3s ease-out forwards;
                 }
             `}</style>
-        </div >
+                <Footer />
+            </div>
+        </div>
     );
 }
 
