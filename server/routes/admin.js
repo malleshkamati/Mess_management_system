@@ -6,6 +6,7 @@ const adminQueries = require('../queries/adminQueries');
 const feedbackQueries = require('../queries/feedbackQueries');
 const pollQueries = require('../queries/pollQueries');
 const auth = require('../middleware/auth');
+const db = require('../db/db');
 
 // Middleware to check if admin
 const adminAuth = (req, res, next) => {
@@ -21,10 +22,13 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
         const meals = await mealQueries.findAllByDate(today);
 
+        const studentCountResult = await db.query("SELECT COUNT(*) FROM users WHERE role = 'student'");
+        const totalStudents = parseInt(studentCountResult.rows[0].count);
+
         const stats = await Promise.all(meals.map(async (meal) => {
             const studentCount = await attendanceQueries.countByMealAndStatus(meal.id, 'going');
             const guestSum = await attendanceQueries.sumGuestsByMeal(meal.id);
-            const buffer = Math.ceil((studentCount + guestSum) * 0.1) + 5;
+            const buffer = Math.ceil((studentCount + guestSum) * 0.1) +1;
             const confidence = 'High';
 
             return {
@@ -37,6 +41,8 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
                 guestCount: guestSum,
                 totalDemand: studentCount + guestSum,
                 buffer,
+                totalStudents,
+                absentCount: totalStudents - studentCount,
                 recommendedPrep: studentCount + guestSum + buffer,
                 confidence
             };
@@ -72,13 +78,9 @@ router.get('/wastage', auth, adminAuth, async (req, res) => {
 router.put('/wastage/:mealId', auth, adminAuth, async (req, res) => {
     try {
         const { mealId } = req.params;
-        const { actualWastage } = req.body;
+        const { actualWastage, wastageKg, remarks, preparedCount } = req.body;
 
-        if (actualWastage === undefined || actualWastage < 0) {
-            return res.status(400).json({ error: 'Valid wastage value required' });
-        }
-
-        const meal = await adminQueries.updateWastage(mealId, actualWastage);
+        const meal = await adminQueries.updateWastage(mealId, actualWastage, wastageKg, remarks, preparedCount);
         if (!meal) {
             return res.status(404).json({ error: 'Meal not found' });
         }

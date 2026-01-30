@@ -7,7 +7,7 @@ import {
 import Footer from '../components/Footer';
 
 export default function Dashboard() {
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const [allMeals, setAllMeals] = useState([]);
     const [karma, setKarma] = useState(user?.karmaPoints || 0);
     const [loading, setLoading] = useState(true);
@@ -102,12 +102,18 @@ export default function Dashboard() {
                 body: JSON.stringify({ optionId })
             });
             if (res.ok) {
+                const data = await res.json();
                 // Update local state to show voted
                 setActivePolls(activePolls.map(p =>
                     p.id === pollId
                         ? { ...p, userVote: optionId, options: p.options.map(o => o.id === optionId ? { ...o, voteCount: parseInt(o.voteCount) + 1 } : o) }
                         : p
                 ));
+                if (data.karma) {
+                    setKarma(data.karma);
+                    updateUser({ karmaPoints: data.karma });
+                }
+                if (data.gained) triggerKarmaPop(data.gained);
             }
         } catch (error) {
             console.error('Error voting:', error);
@@ -143,7 +149,10 @@ export default function Dashboard() {
                     isKarmaClaimed: data.isKarmaClaimed ?? m.isKarmaClaimed,
                     processing: false
                 } : m));
-                if (data.karma) setKarma(data.karma);
+                if (data.karma) {
+                    setKarma(data.karma);
+                    updateUser({ karmaPoints: data.karma });
+                }
                 if (data.gained) triggerKarmaPop(data.gained);
                 fetchImpact(); // Refresh impact after status change
             }
@@ -179,7 +188,10 @@ export default function Dashboard() {
                     isKarmaClaimed: data.isKarmaClaimed ?? m.isKarmaClaimed,
                     processing: false
                 } : m));
-                if (data.karma) setKarma(data.karma);
+                if (data.karma) {
+                    setKarma(data.karma);
+                    updateUser({ karmaPoints: data.karma });
+                }
                 if (data.gained) triggerKarmaPop(data.gained);
             }
         } catch (error) {
@@ -269,12 +281,19 @@ export default function Dashboard() {
                 })
             });
             if (res.ok) {
+                const data = await res.json();
                 showFeedbackToast('success', 'Thank you for your feedback! 🎉');
                 // Clear form
                 setSelectedFeedbackMeal(null);
                 setFeedbackRating(0);
                 setFeedbackRemarks('');
                 setIsAnonymous(false);
+
+                if (data.karma) {
+                    setKarma(data.karma);
+                    updateUser({ karmaPoints: data.karma });
+                }
+                if (data.gained) triggerKarmaPop(data.gained);
             } else {
                 const data = await res.json();
                 showFeedbackToast('error', data.error || 'Failed to submit feedback');
@@ -284,6 +303,30 @@ export default function Dashboard() {
             showFeedbackToast('error', 'Failed to submit feedback');
         } finally {
             setFeedbackSubmitting(false);
+        }
+    };
+
+    const handleLeaveSubmit = async (startDate, endDate, reason) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/breaks/long-break`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ startDate, endDate, reason })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                fetchMeals(); // Refresh meals list
+                return { success: true, message: data.message };
+            } else {
+                return { success: false, error: data.error };
+            }
+        } catch (error) {
+            console.error('Error submitting leave:', error);
+            return { success: false, error: 'Failed to connect to server' };
         }
     };
 
@@ -308,33 +351,8 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50 flex flex-col pt-16">
             <div className="flex-grow pb-24">
-                {/* Header */}
-                <header className="bg-white sticky top-0 z-20 shadow-sm">
-                    <div className="max-w-lg mx-auto px-4 py-4 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-800">
-                                Hi, {user?.name || 'Student'} 👋
-                            </h1>
-                            <p className="text-sm text-gray-500">
-                                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="badge badge-karma animate-pulse-subtle">
-                                <Leaf size={14} />
-                                <span>{karma} Karma</span>
-                            </div>
-                            <button
-                                onClick={logout}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            >
-                                <LogOut size={20} />
-                            </button>
-                        </div>
-                    </div>
-                </header>
 
                 <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
                     {/* Impact Banner */}
@@ -351,6 +369,14 @@ export default function Dashboard() {
                                 You saved <span className="font-bold text-2xl">{impact.foodSavedKg} kg</span> of food so far!
                             </p>
                             <p className="text-sm text-white/70 mt-1">That's approximately {impact.mealsSaved} meals saved</p>
+
+                            <button
+                                onClick={() => setIsLeaveModalOpen(true)}
+                                className="mt-4 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-all active:scale-95"
+                            >
+                                <Calendar size={14} />
+                                Going Home? Plan a Break
+                            </button>
                         </div>
                         <Leaf className="absolute -bottom-6 -right-6 text-white/10 w-32 h-32" />
                     </div>
@@ -386,6 +412,66 @@ export default function Dashboard() {
                             );
                         })}
                     </div>
+
+                    {activePolls.length > 0 && (
+                        <div className="space-y-4">
+                            {activePolls.map(poll => {
+                                const totalVotes = poll.options.reduce((sum, o) => sum + parseInt(o.voteCount || 0), 0);
+                                const hasVoted = poll.userVote;
+
+                                return (
+                                    <div key={poll.id} className="card p-5 border-2 border-purple-200 animate-fade-in">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Vote size={20} className="text-purple-500" />
+                                            <h3 className="font-bold text-gray-800">{poll.question}</h3>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mb-4">
+                                            Poll ends: {new Date(poll.endTime).toLocaleString()}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {poll.options.map(opt => {
+                                                const percent = totalVotes > 0 ? Math.round((parseInt(opt.voteCount) / totalVotes) * 100) : 0;
+                                                const isSelected = poll.userVote === opt.id;
+
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        onClick={() => !hasVoted && submitVote(poll.id, opt.id)}
+                                                        disabled={hasVoted || pollVoting === poll.id}
+                                                        className={`w-full text-left relative rounded-xl overflow-hidden transition-all ${hasVoted ? 'cursor-default' : 'hover:ring-2 hover:ring-purple-300'
+                                                            } ${isSelected ? 'ring-2 ring-purple-500' : ''}`}
+                                                    >
+                                                        <div
+                                                            className={`absolute h-full transition-all ${isSelected ? 'bg-purple-200' : 'bg-gray-100'}`}
+                                                            style={{ width: hasVoted ? `${percent}%` : '0%' }}
+                                                        />
+                                                        <div className="relative flex justify-between items-center p-3">
+                                                            <span className={`text-sm ${isSelected ? 'font-semibold text-purple-700' : 'text-gray-700'}`}>
+                                                                {isSelected && '✓ '}{opt.optionText}
+                                                            </span>
+                                                            {hasVoted && (
+                                                                <span className="text-xs font-medium text-purple-600">{percent}%</span>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {hasVoted && (
+                                            <p className="text-xs text-gray-400 mt-3 text-center">
+                                                You voted! Total: {totalVotes} votes
+                                            </p>
+                                        )}
+                                        {pollVoting === poll.id && (
+                                            <div className="text-center mt-3 text-purple-500 text-sm">
+                                                Submitting...
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Today's Meals */}
                     <div className="space-y-4">
@@ -494,7 +580,7 @@ export default function Dashboard() {
                     </button>
 
                     {/* Active Polls */}
-                    {activePolls.length > 0 && (
+                    {/* {activePolls.length > 0 && (
                         <div className="space-y-4">
                             {activePolls.map(poll => {
                                 const totalVotes = poll.options.reduce((sum, o) => sum + parseInt(o.voteCount || 0), 0);
@@ -552,7 +638,7 @@ export default function Dashboard() {
                                 );
                             })}
                         </div>
-                    )}
+                    )} */}
 
                     {/* Feedback Form */}
                     {!isFeedbackOpen ? (
@@ -705,7 +791,7 @@ export default function Dashboard() {
                     isLeaveModalOpen && (
                         <LeaveModal
                             onClose={() => setIsLeaveModalOpen(false)}
-                            onSubmit={applyBreak}
+                            onSubmit={handleLeaveSubmit}
                         />
                     )
                 }
@@ -855,86 +941,122 @@ function LeaveModal({ onClose, onSubmit }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-slide-up">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-gray-800">Plan Your Break</h2>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <X size={20} className="text-gray-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in ">
+            <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-y-auto max-h-[90vh] animate-slide-up ring-1 ring-white/20">
+                <div className="p-5">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Plan Your Break</h2>
+                            <p className="text-sm text-gray-500 mt-1">Select dates to skip meals</p>
+                        </div>
+                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors group">
+                            <div className="bg-gray-100 group-hover:bg-gray-200 rounded-full p-1 transition-colors">
+                                <X size={20} className="text-gray-500" />
+                            </div>
                         </button>
                     </div>
 
                     {message ? (
-                        <div className={`p-8 text-center animate-fade-in`}>
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${message.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                        <div className={`py-12 text-center animate-fade-in`}>
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${message.type === 'success' ? 'bg-green-50 text-green-600 ring-8 ring-green-50/50' : 'bg-red-50 text-red-600 ring-8 ring-red-50/50'
                                 }`}>
-                                {message.type === 'success' ? <Check size={32} /> : <X size={32} />}
+                                {message.type === 'success' ? <Check size={40} /> : <X size={40} />}
                             </div>
-                            <p className="font-bold text-lg mb-2">{message.type === 'success' ? 'Success!' : 'Oops!'}</p>
-                            <p className="text-gray-500">{message.text}</p>
+                            <p className="font-bold text-xl mb-2 text-gray-800">{message.type === 'success' ? 'Request Sent!' : 'Something went wrong'}</p>
+                            <p className="text-gray-500 max-w-[200px] mx-auto">{message.text}</p>
                         </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-8">
                             {/* Calendar Header */}
                             <div className="flex items-center justify-between px-2">
                                 <button
                                     onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}
-                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-500"
+                                    className="p-2 hover:bg-gray-100 rounded-xl text-gray-500 transition-colors border border-transparent hover:border-gray-200"
                                 >
                                     <ChevronLeft size={20} />
                                 </button>
-                                <span className="font-bold text-gray-700">
+                                <span className="font-bold text-lg text-gray-800 tracking-tight">
                                     {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                 </span>
                                 <button
                                     onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}
-                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-500"
+                                    className="p-2 hover:bg-gray-100 rounded-xl text-gray-500 transition-colors border border-transparent hover:border-gray-200"
                                 >
                                     <ChevronRight size={20} />
                                 </button>
                             </div>
 
                             {/* Calendar Grid */}
-                            <div className="grid grid-cols-7 gap-y-1 text-center">
-                                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                                    <span key={d} className="text-xs font-bold text-gray-400 py-2">{d}</span>
-                                ))}
-                                {Array(firstDay).fill(null).map((_, i) => (
-                                    <div key={`empty-${i}`} className="p-2"></div>
-                                ))}
-                                {Array(days).fill(null).map((_, i) => {
-                                    const day = i + 1;
-                                    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                                    const isPast = date < today;
-                                    const styles = isSelected(day);
+                            <div>
+                                <div className="grid grid-cols-7 mb-2 text-center">
+                                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                                        <span key={d} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-1">{d}</span>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 gap-y-2 text-center">
+                                    {Array(firstDay).fill(null).map((_, i) => (
+                                        <div key={`empty-${i}`} className="h-2"></div>
+                                    ))}
+                                    {Array(days).fill(null).map((_, i) => {
+                                        const day = i + 1;
+                                        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                                        const isPast = date < new Date(today.setHours(0, 0, 0, 0));
 
-                                    return (
-                                        <button
-                                            key={day}
-                                            onClick={() => handleDateClick(day)}
-                                            disabled={isPast}
-                                            className={`p-2 text-sm relative transition-all ${isPast ? 'text-gray-200' : 'text-gray-600 hover:bg-red-50'
-                                                } ${styles}`}
-                                        >
-                                            <span className="relative z-10">{day}</span>
-                                        </button>
-                                    );
-                                })}
+                                        // Custom styles logic
+                                        let btnClass = "h-6 w-full rounded-full text-sm font-medium relative transition-all duration-200 flex items-center justify-center ";
+
+                                        if (startDate && date.getTime() === startDate.getTime()) {
+                                            btnClass += "bg-red-600 text-white z-10 shadow-lg shadow-red-200 scale-105 font-bold";
+                                        } else if (endDate && date.getTime() === endDate.getTime()) {
+                                            btnClass += "bg-red-600 text-white z-10 shadow-lg shadow-red-200 scale-105 font-bold";
+                                        } else if (startDate && endDate && date > startDate && date < endDate) {
+                                            btnClass += "bg-red-50 text-red-600 rounded-none first:rounded-l-full last:rounded-r-full mx-[-2px] w-[calc(100%+4px)]";
+                                        } else if (isPast) {
+                                            btnClass += "text-gray-300 cursor-not-allowed";
+                                        } else {
+                                            btnClass += "text-gray-700 hover:bg-red-50 hover:text-red-600 hover:scale-105 active:scale-95";
+                                        }
+
+                                        // Today indicator
+                                        const isToday = day === new Date().getDate() &&
+                                            currentMonth.getMonth() === new Date().getMonth() &&
+                                            currentMonth.getFullYear() === new Date().getFullYear();
+
+                                        return (
+                                            <div key={day} className="relative p-[1px]">
+                                                {startDate && endDate && date > startDate && date < endDate && (
+                                                    <div className="absolute inset-y-2 left-0 right-0 bg-red-50 -z-10"></div>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDateClick(day)}
+                                                    disabled={isPast}
+                                                    className={btnClass}
+                                                >
+                                                    {day}
+                                                    {isToday && !startDate && !endDate && (
+                                                        <div className="absolute bottom-1.5 w-1 h-1 bg-red-500 rounded-full"></div>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Range Preview */}
-                            <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between gap-4">
+                            <div className="bg-gray-50 rounded-2xl p-1 flex items-center justify-between gap-6 border border-gray-100">
                                 <div className="text-center flex-1">
-                                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Start Date</p>
-                                    <p className="font-bold text-gray-700">
+                                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider ">From</p>
+                                    <p className={`font-bold text-lg ${startDate ? 'text-gray-800' : 'text-gray-300'}`}>
                                         {startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--'}
                                     </p>
                                 </div>
-                                <div className="h-8 w-px bg-gray-200"></div>
+                                <div className="text-gray-300">
+                                    <ChevronRight size={20} />
+                                </div>
                                 <div className="text-center flex-1">
-                                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">End Date</p>
-                                    <p className="font-bold text-gray-700">
+                                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">To</p>
+                                    <p className={`font-bold text-lg ${endDate ? 'text-gray-800' : 'text-gray-300'}`}>
                                         {endDate ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--'}
                                     </p>
                                 </div>
@@ -942,25 +1064,36 @@ function LeaveModal({ onClose, onSubmit }) {
 
                             {/* Reason Input */}
                             <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Reason (Optional)</label>
-                                <input
-                                    type="text"
-                                    className="input focus:ring-red-500"
-                                    placeholder="Vacation, Sickness, etc."
-                                    value={reason}
-                                    onChange={(e) => setReason(e.target.value)}
-                                />
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block ml-1">Reason</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-1 text-gray-700 font-medium focus:ring-2 focus:ring-red-100 focus:border-red-400 focus:outline-none transition-all placeholder:text-gray-300"
+                                        placeholder="Vacation, Going home, etc."
+                                        value={reason}
+                                        onChange={(e) => setReason(e.target.value)}
+                                    />
+                                </div>
                             </div>
 
                             {/* Action Button */}
                             <button
                                 onClick={handleSubmit}
                                 disabled={!startDate || !endDate || loading}
-                                className={`btn w-full py-4 text-lg ${loading ? 'opacity-70' : ''
+                                className={`w-full py-1 rounded-xl text-lg font-bold text-white shadow-xl shadow-red-200 transition-all active:scale-[0.98] ${loading || !startDate || !endDate
+                                    ? 'opacity-50 cursor-not-allowed grayscale'
+                                    : 'hover:shadow-red-300 hover:-translate-y-0.5'
                                     }`}
-                                style={{ background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' }}
+                                style={{ background: 'linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)' }}
                             >
-                                {loading ? 'Submitting...' : 'Confirm Break'}
+                                {loading ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        <span>Processing...</span>
+                                    </div>
+                                ) : (
+                                    'Confirm Break'
+                                )}
                             </button>
                         </div>
                     )}

@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const feedbackQueries = require('../queries/feedbackQueries');
 const mealQueries = require('../queries/mealQueries');
+const userQueries = require('../queries/userQueries');
 
 // Submit feedback for a meal
 router.post('/', auth, async (req, res) => {
@@ -24,7 +25,15 @@ router.post('/', auth, async (req, res) => {
         }
 
         const feedback = await feedbackQueries.create(req.user.id, mealId, rating, remarks, isAnonymous || false);
-        res.status(201).json(feedback);
+
+        // Award 1 Karma Point
+        const updatedUser = await userQueries.incrementKarma(req.user.id, 1);
+
+        res.status(201).json({
+            ...feedback,
+            karma: updatedUser.karmaPoints,
+            gained: 1
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

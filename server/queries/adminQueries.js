@@ -7,7 +7,7 @@ const db = require('../db/db');
 const getWeeklyStats = async () => {
     const result = await db.query(`
         SELECT 
-            m.date,
+            m.date::text as date,
             m.type,
             COUNT(CASE WHEN a.status = 'going' THEN 1 END) as going_count,
             COUNT(CASE WHEN a.status = 'not_eating' THEN 1 END) as not_eating_count,
@@ -35,16 +35,19 @@ const getWastageData = async () => {
     const result = await db.query(`
         SELECT 
             m.id,
-            m.date,
+            m.date::text as date,
             m.type,
             m.actual_wastage,
+            m.wastage_kg,
+            m.wastage_remarks,
+            m.prepared_count,
             COUNT(CASE WHEN a.status = 'going' THEN 1 END) as actual_attendance,
             COALESCE(SUM(a.guest_count), 0) as guests,
             COUNT(CASE WHEN a.status = 'going' THEN 1 END) + COALESCE(SUM(a.guest_count), 0) as total_demand
         FROM meals m
         LEFT JOIN attendances a ON m.id = a.meal_id
         WHERE m.date >= CURRENT_DATE - INTERVAL '45 days' AND m.date <= CURRENT_DATE
-        GROUP BY m.id, m.date, m.type, m.actual_wastage
+        GROUP BY m.id, m.date, m.type, m.actual_wastage, m.wastage_kg, m.wastage_remarks, m.prepared_count
         ORDER BY m.date,
             CASE m.type 
                 WHEN 'breakfast' THEN 1 
@@ -56,9 +59,10 @@ const getWastageData = async () => {
     // Calculate estimated wastage (assuming 10% buffer was prepared)
     return result.rows.map(row => {
         const totalDemand = parseInt(row.total_demand) || 0;
-        const prepared = Math.ceil(totalDemand * 1.1) + 5; // 10% buffer + 5
+        // Use manual prepared count if available, otherwise use 10% buffer estimate
+        const prepared = row.prepared_count !== null ? parseInt(row.prepared_count) : (Math.ceil(totalDemand * 1.1) + 5);
 
-        // Use actual wastage if entered, otherwise estimate
+        // Use actual wastage if entered, otherwise calculate: prepared - totalDemand
         const hasActualWastage = row.actual_wastage !== null;
         const wastage = hasActualWastage ? parseInt(row.actual_wastage) : Math.max(0, prepared - totalDemand);
         const wastagePercent = prepared > 0 ? Math.round((wastage / prepared) * 100) : 0;
@@ -72,8 +76,12 @@ const getWastageData = async () => {
             totalDemand,
             estimatedPrepared: prepared,
             estimatedWastage: wastage,
+            preparedCount: row.prepared_count,
+            wastageKg: row.wastage_kg ? parseFloat(row.wastage_kg) : null,
+            remarks: row.wastage_remarks,
             wastagePercent,
-            hasActualWastage
+            hasActualWastage,
+            actualWastage: row.actual_wastage
         };
     });
 };
@@ -84,10 +92,17 @@ const getWastageData = async () => {
  * @param {number} actualWastage - Actual wastage count
  * @returns {Promise<Object>} - Updated meal
  */
-const updateWastage = async (mealId, actualWastage) => {
+const updateWastage = async (mealId, actualWastage, wastageKg, remarks, preparedCount) => {
     const result = await db.query(
-        `UPDATE meals SET actual_wastage = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
-        [actualWastage, mealId]
+        `UPDATE meals 
+         SET actual_wastage = $1, 
+             wastage_kg = $2, 
+             wastage_remarks = $3, 
+             prepared_count = $4,
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $5 
+         RETURNING *`,
+        [actualWastage, wastageKg, remarks, preparedCount, mealId]
     );
     return result.rows[0];
 };

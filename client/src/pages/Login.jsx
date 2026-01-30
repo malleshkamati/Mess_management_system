@@ -9,19 +9,26 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
     const { login, register } = useAuth();
     const navigate = useNavigate();
+
+    const handleFormChange = () => {
+        setIsLogin(!isLogin);
+        setError('');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError('');
 
         let result;
         if (isLogin) {
             result = await login(email, password);
         } else {
             if (!name.trim()) {
-                alert('Please enter your name');
+                setError('Please enter your name');
                 setLoading(false);
                 return;
             }
@@ -38,7 +45,7 @@ export default function Login() {
                 navigate('/');
             }
         } else {
-            alert(result.error);
+            setError(result.error);
         }
     };
 
@@ -58,7 +65,7 @@ export default function Login() {
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4">
                         <Utensils size={40} className="text-red-500" />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Mess App</h1>
+                    <h1 className="text-3xl font-bold text-white mb-2">MessMaster</h1>
                     <p className="text-white/80">Smart Meal Management System</p>
                 </div>
 
@@ -120,6 +127,12 @@ export default function Login() {
                             </div>
                         </div>
 
+                        {error && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium animate-shake text-center border border-red-100 italic">
+                                ⚠ {error}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={loading}
@@ -139,7 +152,7 @@ export default function Login() {
 
                     <div className="mt-6 text-center">
                         <button
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={handleFormChange}
                             className="text-gray-500 text-sm hover:text-red-500 transition-colors"
                         >
                             {isLogin ? "Don't have an account? " : "Already have an account? "}
@@ -160,7 +173,7 @@ export default function Login() {
                                 Student
                             </button>
                             <button
-                                onClick={() => { setEmail('admin@test.com'); setPassword('123456'); }}
+                                onClick={() => { setEmail('admin@test.com'); setPassword('123456'); setError(''); }}
                                 className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg hover:border-red-300 transition-colors"
                             >
                                 Admin

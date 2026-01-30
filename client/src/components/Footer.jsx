@@ -7,14 +7,14 @@ const Footer = () => {
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="flex flex-col items-center md:items-start">
                         <h3 className="text-lg font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent">
-                            Mess Manager
+                            MessMaster
                         </h3>
                         <p className="text-sm text-gray-500 mt-1">Smart Meal Management System</p>
                     </div>
 
                     <div className="flex flex-col items-center md:items-end">
                         <p className="text-xs text-gray-400">
-                            © {new Date().getFullYear()} Mess Manager. Built for efficiency.
+                            © {new Date().getFullYear()} MessMaster. Built for efficiency.
                         </p>
                         <div className="flex gap-4 mt-2">
                             <a href="#" className="text-xs text-gray-500 hover:text-red-500 transition-colors">Support</a>

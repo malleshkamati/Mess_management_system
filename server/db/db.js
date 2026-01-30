@@ -108,15 +108,30 @@ const initializeSchema = async () => {
                 meal_time TIME DEFAULT '12:00:00',
                 cancel_cutoff TIME DEFAULT '10:00:00',
                 actual_wastage INTEGER DEFAULT NULL,
+                wastage_kg DECIMAL DEFAULT NULL,
+                wastage_remarks TEXT DEFAULT NULL,
+                prepared_count INTEGER DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(date, type)
             )
         `);
 
-        // Add actual_wastage column if not exists (for existing databases)
+        // Add wastage columns if not exists (for existing databases)
         await query(`
             ALTER TABLE meals ADD COLUMN IF NOT EXISTS actual_wastage INTEGER DEFAULT NULL
+        `);
+        await query(`
+            ALTER TABLE meals ADD COLUMN IF NOT EXISTS wastage_kg DECIMAL DEFAULT NULL
+        `);
+        await query(`
+            ALTER TABLE meals ADD COLUMN IF NOT EXISTS wastage_remarks TEXT DEFAULT NULL
+        `);
+        await query(`
+            ALTER TABLE meals ADD COLUMN IF NOT EXISTS prepared_count INTEGER DEFAULT NULL
+        `);
+        await query(`
+            ALTER TABLE attendances ADD COLUMN IF NOT EXISTS is_karma_claimed BOOLEAN DEFAULT false
         `);
 
         // Create Attendances table
@@ -129,6 +144,7 @@ const initializeSchema = async () => {
                 guest_count INTEGER DEFAULT 0,
                 is_late_change BOOLEAN DEFAULT false,
                 skip_reason VARCHAR(255),
+                is_karma_claimed BOOLEAN DEFAULT false,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(user_id, meal_id)
@@ -136,6 +152,7 @@ const initializeSchema = async () => {
         `);
 
         // Create Feedback table
+        await query(`UPDATE users SET karma_points = 0 WHERE karma_points IS NULL`);
         await query(`
             CREATE TABLE IF NOT EXISTS feedback (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
