@@ -306,10 +306,12 @@ export default function Dashboard() {
         }
     };
 
-    const handleLeaveSubmit = async (startDate, endDate, reason) => {
+    const handleLeaveSubmit = async (startDate, endDate, reason, action) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/breaks/long-break`, {
+            const endpoint = action === 'cancel' ? '/breaks/cancel-break' : '/breaks/long-break';
+
+            const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -885,6 +887,7 @@ function LeaveModal({ onClose, onSubmit }) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
+    const [markedLeaves, setMarkedLeaves] = useState([]);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -894,6 +897,28 @@ function LeaveModal({ onClose, onSubmit }) {
 
     const days = getDaysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
     const firstDay = getFirstDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+
+    useEffect(() => {
+        fetchMarkedLeaves();
+    }, [currentMonth]);
+
+    const fetchMarkedLeaves = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const startStr = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString().split('T')[0];
+            const endStr = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toISOString().split('T')[0];
+
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/breaks/my-leaves?startDate=${startStr}&endDate=${endStr}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const dates = await res.json();
+                setMarkedLeaves(dates);
+            }
+        } catch (error) {
+            console.error('Error fetching leaves:', error);
+        }
+    };
 
     const handleDateClick = (day) => {
         const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
@@ -924,16 +949,28 @@ function LeaveModal({ onClose, onSubmit }) {
         return startDate && endDate && date >= startDate && date <= endDate;
     };
 
-    const handleSubmit = async () => {
+    const hasMarkedInSelection = () => {
+        if (!startDate || !endDate) return false;
+        let curr = new Date(startDate);
+        const end = new Date(endDate);
+        while (curr <= end) {
+            if (markedLeaves.includes(curr.toISOString().split('T')[0])) return true;
+            curr.setDate(curr.getDate() + 1);
+        }
+        return false;
+    };
+
+    const handleSubmit = async (action = 'mark') => {
         if (!startDate || !endDate) return;
         setLoading(true);
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
 
-        const result = await onSubmit(startStr, endStr, reason);
+        const result = await onSubmit(startStr, endStr, reason, action);
         setLoading(false);
         if (result.success) {
             setMessage({ type: 'success', text: result.message });
+            fetchMarkedLeaves(); // Refresh leaves
             setTimeout(() => onClose(), 2000);
         } else {
             setMessage({ type: 'error', text: result.error });
@@ -1000,7 +1037,9 @@ function LeaveModal({ onClose, onSubmit }) {
                                     {Array(days).fill(null).map((_, i) => {
                                         const day = i + 1;
                                         const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                                        const dateStr = date.toISOString().split('T')[0];
                                         const isPast = date < new Date(today.setHours(0, 0, 0, 0));
+                                        const isMarked = markedLeaves.includes(dateStr);
 
                                         // Custom styles logic
                                         let btnClass = "h-6 w-full rounded-full text-sm font-medium relative transition-all duration-200 flex items-center justify-center ";
@@ -1011,6 +1050,8 @@ function LeaveModal({ onClose, onSubmit }) {
                                             btnClass += "bg-red-600 text-white z-10 shadow-lg shadow-red-200 scale-105 font-bold";
                                         } else if (startDate && endDate && date > startDate && date < endDate) {
                                             btnClass += "bg-red-50 text-red-600 rounded-none first:rounded-l-full last:rounded-r-full mx-[-2px] w-[calc(100%+4px)]";
+                                        } else if (isMarked) {
+                                            btnClass += "bg-gray-200 text-gray-500 line-through decoration-red-500 decoration-2";
                                         } else if (isPast) {
                                             btnClass += "text-gray-300 cursor-not-allowed";
                                         } else {
@@ -1033,7 +1074,7 @@ function LeaveModal({ onClose, onSubmit }) {
                                                     className={btnClass}
                                                 >
                                                     {day}
-                                                    {isToday && !startDate && !endDate && (
+                                                    {isToday && !startDate && !endDate && !isMarked && (
                                                         <div className="absolute bottom-1.5 w-1 h-1 bg-red-500 rounded-full"></div>
                                                     )}
                                                 </button>
@@ -1076,25 +1117,36 @@ function LeaveModal({ onClose, onSubmit }) {
                                 </div>
                             </div>
 
-                            {/* Action Button */}
-                            <button
-                                onClick={handleSubmit}
-                                disabled={!startDate || !endDate || loading}
-                                className={`w-full py-1 rounded-xl text-lg font-bold text-white shadow-xl shadow-red-200 transition-all active:scale-[0.98] ${loading || !startDate || !endDate
-                                    ? 'opacity-50 cursor-not-allowed grayscale'
-                                    : 'hover:shadow-red-300 hover:-translate-y-0.5'
-                                    }`}
-                                style={{ background: 'linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)' }}
-                            >
-                                {loading ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        <span>Processing...</span>
-                                    </div>
-                                ) : (
-                                    'Confirm Break'
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => handleSubmit('mark')}
+                                    disabled={!startDate || !endDate || loading}
+                                    className={`flex-1 py-1 rounded-xl text-lg font-bold text-white shadow-xl shadow-red-200 transition-all active:scale-[0.98] ${loading || !startDate || !endDate
+                                        ? 'opacity-50 cursor-not-allowed grayscale'
+                                        : 'hover:shadow-red-300 hover:-translate-y-0.5'
+                                        }`}
+                                    style={{ background: 'linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)' }}
+                                >
+                                    {loading ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            <span>Processing...</span>
+                                        </div>
+                                    ) : (
+                                        'Confirm Break'
+                                    )}
+                                </button>
+
+                                {hasMarkedInSelection() && (
+                                    <button
+                                        onClick={() => handleSubmit('cancel')}
+                                        disabled={loading}
+                                        className="px-4 py-1 rounded-xl text-sm font-bold text-green-600 border-2 border-green-200 hover:bg-green-50 transition-all active:scale-[0.95]"
+                                    >
+                                        Cancel Break
+                                    </button>
                                 )}
-                            </button>
+                            </div>
                         </div>
                     )}
                 </div>

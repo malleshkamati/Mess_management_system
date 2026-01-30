@@ -168,6 +168,31 @@ const getSkipsByUser = async (userId) => {
     return parseInt(result.rows[0].count, 10);
 };
 
+/**
+ * Bulk update attendances status
+ * @param {string} userId - User UUID
+ * @param {Array<string>} mealIds - Array of meal UUIDs
+ * @param {string} status - New status ('going' or 'not_eating')
+ * @returns {Promise<number>} - Number of updated records
+ */
+const bulkSetStatus = async (userId, mealIds, status) => {
+    if (!mealIds || mealIds.length === 0) return 0;
+
+    const skipReason = status === 'not_eating' ? 'Long Break' : null;
+
+    // Use upsert (INSERT ON CONFLICT) for efficiency
+    const result = await db.query(
+        `INSERT INTO attendances (user_id, meal_id, status, skip_reason)
+         SELECT $1, unnest($2::uuid[]), $3, $4
+         ON CONFLICT (user_id, meal_id) 
+         DO UPDATE SET status = $3, skip_reason = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE attendances.status != $3`,
+        [userId, mealIds, status, skipReason]
+    );
+
+    return result.rowCount;
+};
+
 module.exports = {
     findOrCreate,
     update,
@@ -175,5 +200,6 @@ module.exports = {
     countByMealAndStatus,
     sumGuestsByMeal,
     bulkSetNotEating,
-    getSkipsByUser
+    getSkipsByUser,
+    bulkSetStatus
 };
