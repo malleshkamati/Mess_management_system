@@ -10,7 +10,8 @@ export default function AdminDashboard() {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [stats, setStats] = useState([]);
-    const [weeklyStats, setWeeklyStats] = useState([]);
+    const [weeklyStats, setWeeklyStats] = useState({ weeklyData: [], totalStudents: 0 }); // Updated initial state
+    const [weeklyPage, setWeeklyPage] = useState(1);
     const [wastageData, setWastageData] = useState([]);
     const [users, setUsers] = useState([]);
     const [meals, setMeals] = useState([]);
@@ -385,7 +386,7 @@ export default function AdminDashboard() {
         { id: 'meals', label: 'Meals', icon: ChefHat },
         { id: 'users', label: 'Users', icon: Users },
         { id: 'feedback', label: 'Feedback', icon: MessageSquare },
-        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'settings', label: 'Polls', icon: Settings },
     ];
 
     return (
@@ -463,34 +464,34 @@ export default function AdminDashboard() {
                                         <div className="flex items-center gap-2 group relative">
                                             <span className="text-sm text-gray-500">Total Prep (predicted)</span>
 
-                                            {/* <Info size={14} className="text-gray-400 cursor-help" /> */}
+                                            <Info size={14} className="text-gray-400 cursor-help" />
                                             {/* Tooltip */}
-                                            {/* <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
                                                 <div className="font-bold mb-1 text-gray-300">Prediction Formula</div>
                                                 <div className="space-y-1">
                                                     <div className="flex justify-between">
-                                                        <span>Hostel Strength</span>
+                                                        <span>Students Going</span>
                                                         <span className="text-green-400">+</span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span>Guests</span>
                                                         <span className="text-green-400">+</span>
                                                     </div>
-                                                    <div className="flex justify-between text-red-300">
-                                                        <span>Absent Students</span>
-                                                        <span>-</span>
+                                                    <div className="flex justify-between">
+                                                        <span>Buffer (10% + 1)</span>
+                                                        <span className="text-green-400">+</span>
                                                     </div>
                                                     <div className="h-px bg-gray-700 my-1"></div>
                                                     <div className="flex justify-between font-bold">
-                                                        <span>Net Demand</span>
+                                                        <span>Total Prep</span>
                                                         <span className="text-blue-300">=</span>
                                                     </div>
-                                                    <div className="flex justify-between text-gray-400 text-[10px] mt-1 italic">
-                                                        <span>+ Safety Buffer (10%)</span>
+                                                    <div className="mt-2 text-[10px] text-gray-400 italic leading-tight">
+                                                        *Calculated based on marked attendance and guest registration.
                                                     </div>
                                                 </div>
-                                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
-                                            </div> */}
+                                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
+                                            </div>
                                         </div>
                                     </div>
                                     <p className="text-3xl font-bold text-gray-800">{totalPrep}</p>
@@ -796,6 +797,122 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
 
+                            {/* Weekly Attendance & Predictions Table */}
+                            <div className="card overflow-hidden w-full lg:w-3/4 mx-auto lg:mx-0">
+                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                            <Calendar size={22} className="text-blue-500" />
+                                            Weekly Attendance & Predictions
+                                        </h2>
+                                        <p className="text-sm text-gray-500 mt-1">Projected demand based on attendance</p>
+                                    </div>
+                                    <div className="text-sm font-medium bg-blue-50 text-blue-700 px-3 py-1 rounded-lg">
+                                        Total: {weeklyStats.totalStudents || 0}
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50/50">
+                                            <tr>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Date</th>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Meal</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Absent</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Going</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50">Total</th>
+                                                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider text-red-500">Prep</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {weeklyStats.weeklyData && weeklyStats.weeklyData.length > 0 ? (
+                                                weeklyStats.weeklyData
+                                                    .slice((weeklyPage - 1) * 5, weeklyPage * 5)
+                                                    .map((row, idx) => {
+                                                        const date = new Date(row.date);
+                                                        const isToday = new Date().toDateString() === date.toDateString();
+
+                                                        const totalStudents = weeklyStats.totalStudents || 0;
+                                                        const notEating = parseInt(row.not_eating_count) || 0;
+                                                        const going = Math.max(0, totalStudents - notEating);
+                                                        const guests = parseInt(row.guest_count) || 0;
+                                                        const totalDemand = going + guests;
+                                                        const buffer = Math.ceil(totalDemand * 0.1);
+                                                        const recPrep = totalDemand + buffer;
+
+                                                        return (
+                                                            <tr key={`${row.date}-${row.type}`} className={`group hover:bg-gray-50 transition-colors ${isToday ? 'bg-blue-50/30' : ''}`}>
+                                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                                    <div className="flex flex-col">
+                                                                        <span className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                                                                            {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500">
+                                                                            {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg">{getMealIcon(row.type)}</span>
+                                                                        <span className="text-sm font-medium text-gray-700 capitalize">{row.type}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                                        {notEating}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                                    <span className="text-sm font-bold text-gray-700">{going}</span>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-center bg-gray-50 group-hover:bg-gray-100 transition-colors">
+                                                                    <span className="text-sm font-bold text-gray-800">{totalDemand}</span>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold bg-red-50 text-red-600 border border-red-100">
+                                                                        {recPrep}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
+                                                        No data available for the upcoming week.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Pagination Controls */}
+                                {weeklyStats.weeklyData && weeklyStats.weeklyData.length > 5 && (
+                                    <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-100">
+                                        <div className="text-sm text-gray-500">
+                                            Page <span className="font-bold text-gray-700">{weeklyPage}</span> of {Math.ceil(weeklyStats.weeklyData.length / 5)}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setWeeklyPage(prev => Math.max(1, prev - 1))}
+                                                disabled={weeklyPage === 1}
+                                                className="btn btn-secondary py-1 px-3 text-sm disabled:opacity-50"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                onClick={() => setWeeklyPage(prev => Math.min(Math.ceil(weeklyStats.weeklyData.length / 5), prev + 1))}
+                                                disabled={weeklyPage >= Math.ceil(weeklyStats.weeklyData.length / 5)}
+                                                className="btn btn-secondary py-1 px-3 text-sm disabled:opacity-50"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Wastage Input Modal */}
                             {wastageFormData && (
                                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setWastageFormData(null)}>
@@ -888,7 +1005,7 @@ export default function AdminDashboard() {
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Prepared Meal Count</label>
                                                 <div className="relative">
-                                                    <ChefHat className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                                    {/* <ChefHat className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /> */}
                                                     <input
                                                         type="number"
                                                         min="0"
@@ -931,7 +1048,7 @@ export default function AdminDashboard() {
                             )}
 
                             {/* Today's Meals */}
-                            <div className="space-y-4">
+                            {/* <div className="space-y-4">
                                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                                     <ChefHat size={20} className="text-red-500" />
                                     Today's Meal Demand
@@ -991,7 +1108,7 @@ export default function AdminDashboard() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </div> */}
                         </div>
                     )}
 
@@ -1274,7 +1391,7 @@ export default function AdminDashboard() {
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
                             {/* Collapsible Meal Timing Settings */}
-                            <button
+                            {/* <button
                                 onClick={() => setShowTimingSettings(!showTimingSettings)}
                                 className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 transition-all"
                             >
@@ -1288,9 +1405,9 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                                 <span className={`text-gray-400 transition-transform ${showTimingSettings ? 'rotate-180' : ''}`}>▼</span>
-                            </button>
+                            </button> */}
 
-                            {showTimingSettings && (
+                            {/* {showTimingSettings && (
                                 <div className="bg-gray-50 rounded-xl p-4 -mt-2 border border-gray-100">
                                     <div className="flex gap-3">
                                         {['breakfast', 'lunch', 'dinner'].map(type => (
@@ -1314,10 +1431,10 @@ export default function AdminDashboard() {
                                     </div>
                                     <p className="text-[10px] text-gray-400 mt-3 text-center">Changes apply to newly created meals only</p>
                                 </div>
-                            )}
+                            )} */}
 
                             {/* Poll Management Section */}
-                            <div className="mt-8 pt-8 border-t">
+                            <div className="mt-8 pt-8 ">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
                                         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">

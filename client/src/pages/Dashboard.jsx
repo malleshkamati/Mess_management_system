@@ -384,7 +384,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Date Navigator */}
-                    <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex items-center justify-between overflow-x-auto">
+                    <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex items-center gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory">
                         {Array.from({ length: 7 }, (_, i) => {
                             const date = new Date();
                             date.setDate(date.getDate() + i);
@@ -396,7 +396,7 @@ export default function Dashboard() {
                                 <button
                                     key={dateStr}
                                     onClick={() => setSelectedDate(dateStr)}
-                                    className={`flex-shrink-0 flex flex-col items-center justify-center w-14 py-3 rounded-xl transition-all ${isActive
+                                    className={`flex-shrink-0 flex flex-col items-center justify-center w-14 py-3 rounded-xl transition-all snap-center ${isActive
                                         ? 'bg-red-500 text-white shadow-lg shadow-red-200'
                                         : 'hover:bg-gray-50'
                                         }`}
@@ -547,7 +547,7 @@ export default function Dashboard() {
                                                 }`}
                                             style={!meal.isExpired && meal.userStatus !== 'going' ? { background: 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)' } : {}}
                                         >
-                                            {meal.isExpired ? 'Meal Ended' : meal.userStatus === 'going' ? 'Cancel Meal' : `I am going${!meal.isKarmaClaimed ? ' (+1)' : ''}`}
+                                            {meal.isExpired ? 'Meal Ended' : meal.userStatus === 'going' ? 'Cancel Meal' : 'I am going'}
                                         </button>
 
                                         <button
@@ -562,7 +562,7 @@ export default function Dashboard() {
                                         >
                                             <Users size={18} className={!meal.isExpired && (meal.guestCount || 0) > 0 ? 'animate-bounce' : ''} />
                                             <span className="text-sm font-semibold ml-1">
-                                                {(meal.guestCount || 0) > 0 ? `Guest: ${meal.guestCount}` : `Add Guest${!meal.isKarmaClaimed ? ' (+1)' : ''}`}
+                                                {(meal.guestCount || 0) > 0 ? `Guest: ${meal.guestCount}` : 'Add Guest'}
                                             </span>
                                         </button>
                                     </div>

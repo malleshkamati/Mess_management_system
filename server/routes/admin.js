@@ -28,7 +28,7 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
         const stats = await Promise.all(meals.map(async (meal) => {
             const studentCount = await attendanceQueries.countByMealAndStatus(meal.id, 'going');
             const guestSum = await attendanceQueries.sumGuestsByMeal(meal.id);
-            const buffer = Math.ceil((studentCount + guestSum) * 0.1) +1;
+            const buffer = Math.ceil((studentCount + guestSum) * 0.1) + 1;
             const confidence = 'High';
 
             return {
@@ -58,7 +58,10 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
 router.get('/weekly-stats', auth, adminAuth, async (req, res) => {
     try {
         const stats = await adminQueries.getWeeklyStats();
-        res.json(stats);
+        const studentCountResult = await db.query("SELECT COUNT(*) FROM users WHERE role = 'student'");
+        const totalStudents = parseInt(studentCountResult.rows[0].count);
+
+        res.json({ weeklyData: stats, totalStudents });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

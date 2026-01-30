@@ -9,14 +9,13 @@ const getWeeklyStats = async () => {
         SELECT 
             m.date::text as date,
             m.type,
-            COUNT(CASE WHEN a.status = 'going' THEN 1 END) as going_count,
             COUNT(CASE WHEN a.status = 'not_eating' THEN 1 END) as not_eating_count,
             COALESCE(SUM(a.guest_count), 0) as guest_count
         FROM meals m
         LEFT JOIN attendances a ON m.id = a.meal_id
-        WHERE m.date >= CURRENT_DATE - INTERVAL '7 days' AND m.date <= CURRENT_DATE
+        WHERE m.date >= CURRENT_DATE AND m.date <= CURRENT_DATE + INTERVAL '7 days'
         GROUP BY m.date, m.type, m.id
-        ORDER BY m.date DESC,
+        ORDER BY m.date,
             CASE m.type 
                 WHEN 'breakfast' THEN 1 
                 WHEN 'lunch' THEN 2 

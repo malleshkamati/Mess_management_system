@@ -113,9 +113,10 @@ router.post('/:id/intent', auth, async (req, res) => {
         );
 
         // KARMA LOGIC:
-        // Award points if the user declares 'going' AND hasn't claimed karma for this meal yet
+        // Award points if the user declares 'going' OR 'not_eating' AND hasn't claimed karma for this meal yet
+        // Incentivize ANY explicit communication to help planning
         let pointsAwarded = 0;
-        if (status === 'going' && !att.isKarmaClaimed) {
+        if (!att.isKarmaClaimed) {
             await userQueries.incrementKarma(req.user.id, 1);
             pointsAwarded = 1;
             // Mark as claimed
