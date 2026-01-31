@@ -4,6 +4,7 @@
 Check out the live application here: [Mess Management System](https://mess-management-system-ashen.vercel.app/)
 
 > **Tip:** To explore **Admin functionality**, use the demo credentials provided on the login page. Simply click the "Admin" text located below the login button to auto-fill the credentials.
+As I’m using a free server, responses may take some time. Please cooperate.
 
 ## Project Overview
 This is a PERN-stack  application designed to manage mess operations effectively. It includes features for meal intent tracking, admin analytics, and a karma-based incentive system.
