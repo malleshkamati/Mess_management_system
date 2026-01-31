@@ -12,12 +12,32 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/meals', require('./routes/meals'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/breaks', require('./routes/longBreak'));
-app.use('/api/feedback', require('./routes/feedback'));
-app.use('/api/polls', require('./routes/polls'));
+// Route Imports
+const authRoutes = require('./routes/auth');
+const mealRoutes = require('./routes/meals');
+const adminRoutes = require('./routes/admin');
+const breakRoutes = require('./routes/longBreak');
+const feedbackRoutes = require('./routes/feedback');
+const pollRoutes = require('./routes/polls');
+
+// Routes - Mount at both /api and root to handle misconfiguration
+app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
+app.use('/api/meals', mealRoutes);
+app.use('/meals', mealRoutes);
+
+app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
+
+app.use('/api/breaks', breakRoutes);
+app.use('/breaks', breakRoutes);
+
+app.use('/api/feedback', feedbackRoutes);
+app.use('/feedback', feedbackRoutes);
+
+app.use('/api/polls', pollRoutes);
+app.use('/polls', pollRoutes);
 
 app.get('/', (req, res) => {
     res.send('Mess Management API is running');
