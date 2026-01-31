@@ -91,4 +91,4 @@ npm run dev
 ```
 
 ## Admin Access
-To access the admin dashboard, you may need a user with the `admin` role in the database.
+To access the admin dashboard, in login page demo credentials click on admin
