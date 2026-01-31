@@ -6,7 +6,7 @@ Check out the live application here: [Mess Management System](https://mess-manag
 > **Tip:** To explore **Admin functionality**, use the demo credentials provided on the login page. Simply click the "Admin" text located below the login button to auto-fill the credentials.
 
 ## Project Overview
-This is a PERN-stack-like application designed to manage mess operations effectively. It includes features for meal intent tracking, admin analytics, and a karma-based incentive system.
+This is a PERN-stack  application designed to manage mess operations effectively. It includes features for meal intent tracking, admin analytics, and a karma-based incentive system.
 
 ## Prerequisites
 -   **Node.js**: Ensure you have Node.js installed (v16+ recommended).
@@ -70,21 +70,24 @@ The application will typically run on `http://localhost:5173`.
 
 ---
 
-## Problem Statement
-The core challenge addressed by this project is **balancing flexibility for residents with predictability for the mess staff**.
-Residents need the freedom to decide whether to eat at the mess or not, while the mess staff requires accurate headcounts to minimize food wastage and prevent shortages.
-This project focuses on designing a robust **Meal Intent & Tracking System** that incentivizes accurate reporting from residents, ensuring that the staff has reliable data for meal preparation.
+1. What problem did you choose to solve?
+The core problem is Food Wastage and Inefficiency in institutional messes (hostels/canteens).
+Wastage: Cooks often prepare food for the total number of registered students, but many skip meals without notice, leading to significant food waste.
+Uncertainty: Mess admins lack real-time data on how many students are actually coming, leading to either over-preparation (waste) or under-preparation (food run-outs).
+Lack of Communication: There is no efficient channel for students to inform the mess about guests, long leaves, or meal feedback.
+2. How your solution works
+The solution is a User-Admin Web Application that bridges the gap between students and mess staff:
+For Students (Incentivized Reporting):
+Meal Intent: Students can mark themselves as "Skipping" or "Eating" for upcoming meals.
+Gamification (Karma Points): To solve the issue of laziness, the system encourages students to update their status (including cancelling a meal) by awarding "Karma Points." These points unlock value (e.g., claiming rewards), transforming data entry into a rewarding activity.
+Features: Students can also register guests, apply for long leaves (rebates), and vote on menu polls.
+For Admins (Data-Driven Decisions):
+Predictive Dashboard: Admins see a "Recommended Prep" count based on confirmed attendance + guests + a safety buffer.
+Wastage Intelligence: A heatmap and analytics dashboard show trends in wastage, helping refine purchasing and cooking decisions over time.
+Feedback Loop: A direct channel for students to rate meals ensures quality control.
+3. Assumptions Made
+Opt-Out Model: We assume the default status of a student is "Eating". This ensures that students who simply forget to use the app don't go hungry, but it places the onus on them to "Opt-Out" (cancel) to save food.
+Tech Adoption: We assume students have access to smartphones/laptops and that the mess staff has a tablet/computer to view the dashboard in the kitchen.
+Honesty & Trust: The system assumes students will report honestly (incentivized by Karma) and that cooks will trust the "Recommended Prep" numbers provided by the algorithm.
+Buffer Sufficiency: We assumed a 10% safety buffer (plus guests) is sufficient to handle last-minute walk-ins without causing food shortages.
 
-## How it Works
-1.  **Meal Intent Tracking**: The system allows residents to declare their meal status (Going/Not Going). This provides a baseline forecast for the mess staff.
-2.  **Cut-off Times**: To ensure predictability, changes to meal status are locked a set time before each meal, giving staff a fixed window to prepare.
-3.  **Karma/Incentive System**: To bridge the gap between "intent" and "action", the system implements a Karma score.
-    -   Residents earn points for accurately reporting their status and following through.
-    -   This gamification encourages residents to keep their status updated, directly improving the reliability of the data for the staff.
-4.  **Admin Dashboard**: Mess admins have a real-time dashboard showing the expected absentee count and effective demand, allowing them to adjust cooking quantities dynamically.
-
-## Assumptions
--   **Connectivity**: All residents and mess staff have consistent access to the web-based application.
--   **Incentives Work**: We assume that a social/gamified credit system (Karma) is sufficient motivation for students to accurately report their attendance.
--   **Honesty**: The system relies on physical verification (e.g., QR scan or manual check) to confirm attendance vs. intent, assuming that the check-in process is strictly enforced.
--   **Staff Digital Literacy**: The mess staff is capable of interpreting the digital dashboard to make cooking decisions.
