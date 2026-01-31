@@ -93,5 +93,5 @@ The solution is a **User-Admin Web Application** that bridges the gap between st
 ## Assumptions
 -   **Opt-Out Model**: We assume the default status of a student is "Eating". This ensures that students who simply forget to use the app don't go hungry, but it places the onus on them to "Opt-Out" (cancel) to save food.
 -   **Tech Adoption**: We assume students have access to smartphones/laptops and that the mess staff has a tablet/computer to view the dashboard in the kitchen.
--   **Honesty & Trust**: The system assumes students will report honestly (incentivized by Karma) and that cooks will trust the "Recommended Prep" numbers provided by算法.
 -   **Buffer Sufficiency**: We assumed a 10% safety buffer (plus guests) is sufficient to handle last-minute walk-ins without causing food shortages.
+-  **Incentives Work**: We assume that a social/gamified credit system (Karma) is sufficient motivation for students to accurately report their attendance.
