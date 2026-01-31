@@ -23,20 +23,29 @@ app.get('/', (req, res) => {
     res.send('Mess Management API is running');
 });
 
-// Initialize Database and Start Server
-const startServer = async () => {
+// Initialize Database
+const initializeDB = async () => {
     try {
-        // Initialize database schema
         await db.initializeSchema();
         console.log('Database connected and schema initialized');
-
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-        });
     } catch (err) {
         console.error('Database connection failed:', err);
-        process.exit(1);
     }
 };
 
-startServer();
+// Start Server if not running on Vercel
+if (require.main === module) {
+    initializeDB().then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+    });
+} else {
+    // For Vercel, we need to initialize DB on first request ideally, 
+    // or just assume the pool connection works. 
+    // Vercel might kill the process, so lightweight connection is better.
+    // We'll just run initialization asynchronously.
+    initializeDB();
+}
+
+module.exports = app;
