@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Utensils, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Utensils, Mail, Lock, ArrowRight, ChefHat } from 'lucide-react';
+import logo from '../assets/mess_master_logo.png';
 
 export default function Login() {
     const [isLogin, setIsLogin] = useState(true);
@@ -42,7 +43,7 @@ export default function Login() {
             if (savedUser?.role === 'admin' || savedUser?.role === 'manager') {
                 navigate('/admin');
             } else {
-                navigate('/');
+                navigate('/dashboard');
             }
         } else {
             setError(result.error);
@@ -62,11 +63,13 @@ export default function Login() {
             <div className="w-full max-w-md relative">
                 {/* Logo/Brand */}
                 <div className="text-center mb-8 animate-fade-in">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4">
-                        <Utensils size={40} className="text-red-500" />
+                    <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-lg mb-4 p-2">
+                        <img src={logo} alt="MessMaster Logo" className="w-full h-full object-cover rounded-full" />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">MessMaster</h1>
-                    <p className="text-white/80">Smart Meal Management System</p>
+                    <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
+                        MessMaster
+                    </h1>
+                    <p className="text-white/90 font-medium">Smart Meal Management System</p>
                 </div>
 
                 {/* Card */}

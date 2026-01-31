@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Utensils, LogOut, LayoutDashboard, Settings, User as UserIcon, ChefHat } from 'lucide-react';
+import logo from '../assets/mess_master_logo.png';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -16,16 +17,15 @@ const Navbar = () => {
         logout();
         navigate('/login');
     };
-
     return (
         <nav className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-50 flex items-center justify-between px-4 md:px-8">
             {/* Logo & Brand */}
             <div
                 className="flex items-center gap-2 cursor-pointer"
-                onClick={() => navigate(isAdmin ? '/admin' : '/')}
+                onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
             >
-                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-                    <ChefHat className="text-red-500" size={24} />
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-0.5 border border-red-50">
+                    <img src={logo} alt="Logo" className="w-full h-full object-cover rounded-full" />
                 </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-orange-500 bg-clip-text text-transparent hidden sm:block">
                     MessMaster

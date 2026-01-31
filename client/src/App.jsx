@@ -6,6 +6,8 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 
+import LandingPage from './pages/LandingPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -13,8 +15,9 @@ function App() {
         <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
           <Navbar />
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<ProtectedRoute role="student"><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute role="student"><Dashboard /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
           </Routes>
         </div>
