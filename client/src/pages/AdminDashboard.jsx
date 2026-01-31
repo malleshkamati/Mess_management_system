@@ -374,12 +374,24 @@ export default function AdminDashboard() {
         );
     }
 
+    // Determine current/next meal based on time
+    const getCurrentMealType = () => {
+        const hour = new Date().getHours();
+        if (hour < 10) return 'breakfast';
+        if (hour < 15) return 'lunch';
+        return 'dinner';
+    };
+
+    const currentType = getCurrentMealType();
+    const currentMealStats = stats.find(s => s.type === currentType) || stats[0] || {};
+
     const registeredStudents = stats.length > 0 ? stats[0].totalStudents : 0;
-    const totalStudents = stats.reduce((sum, s) => sum + s.studentCount, 0);
-    const totalGuests = stats.reduce((sum, s) => sum + s.guestCount, 0);
-    // const totalAbsent = stats.reduce((sum, s) => sum + (s.absentCount || 0), 0);
-    const totalAbsent = stats.absentCount || 0;
-    const totalPrep = stats.reduce((sum, s) => sum + s.recommendedPrep, 0);
+
+    // Stats for the CURRENT meal only
+    const currentAttendance = currentMealStats.studentCount || 0;
+    const currentGuests = currentMealStats.guestCount || 0;
+    const currentAbsent = currentMealStats.absentCount || 0;
+    const currentPrep = currentMealStats.recommendedPrep || 0;
 
     const tabs = [
         { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -434,27 +446,30 @@ export default function AdminDashboard() {
                                         <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                                             <Users size={20} className="text-blue-600" />
                                         </div>
-                                        <span className="text-sm text-gray-500">Students Today(marked)</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm text-gray-500">Going ({currentMealStats.type || 'Next'})</span>
+                                            {/* <span className="text-[10px] text-gray-400">Marked for {currentMealStats.type}</span> */}
+                                        </div>
                                     </div>
-                                    <p className="text-3xl font-bold text-gray-800">{totalStudents}</p>
+                                    <p className="text-3xl font-bold text-gray-800">{currentAttendance}</p>
                                 </div>
                                 <div className="card p-5">
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                                             <Users size={20} className="text-purple-600" />
                                         </div>
-                                        <span className="text-sm text-gray-500">Guests Today(marked)</span>
+                                        <span className="text-sm text-gray-500">Guests ({currentMealStats.type || 'Next'})</span>
                                     </div>
-                                    <p className="text-3xl font-bold text-gray-800">{totalGuests}</p>
+                                    <p className="text-3xl font-bold text-gray-800">{currentGuests}</p>
                                 </div>
                                 <div className="card p-5">
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                                             <LogOut size={20} className="text-red-600" />
                                         </div>
-                                        <span className="text-sm text-gray-500">Absent Today(marked)</span>
+                                        <span className="text-sm text-gray-500">Absent ({currentMealStats.type || 'Next'})</span>
                                     </div>
-                                    <p className="text-3xl font-bold text-gray-800">{totalAbsent}</p>
+                                    <p className="text-3xl font-bold text-gray-800">{currentAbsent}</p>
                                 </div>
                                 <div className="card p-5">
                                     <div className="flex items-center gap-3 mb-2">
@@ -462,7 +477,7 @@ export default function AdminDashboard() {
                                             <TrendingUp size={20} className="text-green-600" />
                                         </div>
                                         <div className="flex items-center gap-2 group relative">
-                                            <span className="text-sm text-gray-500">Total Prep (predicted)</span>
+                                            <span className="text-sm text-gray-500">Prep ({currentMealStats.type || 'Next'})</span>
 
                                             <Info size={14} className="text-gray-400 cursor-help" />
                                             {/* Tooltip */}
@@ -494,7 +509,7 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-3xl font-bold text-gray-800">{totalPrep}</p>
+                                    <p className="text-3xl font-bold text-gray-800">{currentPrep}</p>
                                 </div>
                             </div>
 

@@ -26,7 +26,16 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
         const totalStudents = parseInt(studentCountResult.rows[0].count);
 
         const stats = await Promise.all(meals.map(async (meal) => {
-            const studentCount = await attendanceQueries.countByMealAndStatus(meal.id, 'going');
+            // Opt-out model: "going" is default (Total - Not Eating)
+            // "absent" is explicitly "not_eating"
+            const notEatingCount = await attendanceQueries.countByMealAndStatus(meal.id, 'not_eating');
+
+            // Explicit 'going' records (for verification, though we assume implicit)
+            // const explicitGoing = await attendanceQueries.countByMealAndStatus(meal.id, 'going');
+
+            const absentCount = notEatingCount;
+            const studentCount = totalStudents - absentCount;
+
             const guestSum = await attendanceQueries.sumGuestsByMeal(meal.id);
             const buffer = Math.ceil((studentCount + guestSum) * 0.1) + 1;
             const confidence = 'High';
@@ -42,7 +51,7 @@ router.get('/demand', auth, adminAuth, async (req, res) => {
                 totalDemand: studentCount + guestSum,
                 buffer,
                 totalStudents,
-                absentCount: totalStudents - studentCount,
+                absentCount,
                 recommendedPrep: studentCount + guestSum + buffer,
                 confidence
             };
