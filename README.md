@@ -6,7 +6,7 @@ Check out the live application here: [Mess Management System](https://mess-manag
 > **Tip:** To explore **Admin functionality**, use the demo credentials provided on the login page. Simply click the "Admin" text located below the login button to auto-fill the credentials.
 
 ## Project Overview
-This is a MERN-stack-like application (PostgreSQL instead of MongoDB) designed to manage mess operations effectively. It includes features for meal intent tracking, admin analytics, and a karma-based incentive system.
+This is a PERN-stack-like application designed to manage mess operations effectively. It includes features for meal intent tracking, admin analytics, and a karma-based incentive system.
 
 ## Prerequisites
 -   **Node.js**: Ensure you have Node.js installed (v16+ recommended).
